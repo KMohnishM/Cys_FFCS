@@ -5,6 +5,7 @@ import { collection, query, onSnapshot, doc, runTransaction } from 'firebase/fir
 import type { Department } from '../types'
 import { UserProgress } from '../lib/useAuthGuard'
 import WorkflowSteps from '../components/WorkflowSteps'
+import Navigation from '../components/Navigation'
 
 export default function Departments(){
   const [departments, setDepartments] = useState<Department[]>([])
@@ -12,12 +13,22 @@ export default function Departments(){
   const [selected, setSelected] = useState<string[]>([])
   const [locked, setLocked] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [userRole, setUserRole] = useState<string | null>(null)
 
   useEffect(()=>{
     if (typeof window === 'undefined') return
     const auth = getAuthClient()
-    const unsub = auth.onAuthStateChanged((u: any | null)=>{
+    const db = getDbClient()
+    const unsub = auth.onAuthStateChanged(async (u: any | null)=>{
       setUserId(u?.uid ?? null)
+      if (u) {
+        const { doc, getDoc } = await import('firebase/firestore')
+        const userRef = doc(db, 'users', u.uid)
+        const userSnap = await getDoc(userRef)
+        setUserRole(userSnap.exists() ? (userSnap.data() as any).role : null)
+      } else {
+        setUserRole(null)
+      }
     })
     return ()=>unsub()
   },[])
@@ -58,14 +69,14 @@ export default function Departments(){
     if(locked) return
     setSelected(prev=>{
       if(prev.includes(id)) return prev.filter(x=>x!==id)
-      if(prev.length>=2) return prev
+      if(prev.length>=1) return prev
       return [...prev,id]
     })
   }
 
   const confirm = async ()=>{
     if(!userId) return alert('Sign in required')
-    if(selected.length!==2) return alert('Choose exactly 2 departments')
+    if(selected.length!==1) return alert('Choose exactly 1 department')
     setLoading(true)
     const db = getDbClient()
     try{
@@ -99,178 +110,134 @@ export default function Departments(){
   }
 
   return (
-    <div className="min-h-screen p-8 container mx-auto">
-      <div className="max-w-4xl mx-auto bg-pagebg/60 rounded-xl p-6 backdrop-blur-md shadow-lg border border-cyscom/10 
-        animate-fadeIn relative overflow-hidden">
-        {/* Cyber decoration */}
-        <div className="absolute -bottom-20 -left-20 w-40 h-40 bg-cyscom/10 rounded-full blur-3xl"></div>
-        <div className="absolute -top-20 -right-20 w-40 h-40 bg-cyscom/10 rounded-full blur-3xl"></div>
+    <div className="min-h-screen bg-black">
+      <Navigation userRole={userRole} />
+      
+      {/* Minimalist Hero Section */}
+      <div className="relative overflow-hidden">
+        {/* Background Effects */}
+        <div className="absolute inset-0 bg-gradient-to-br from-black via-cyberdark-900 to-black"></div>
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-cyscom/5 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-cyscom/3 rounded-full blur-3xl"></div>
         
-        <div className="relative">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-2xl font-semibold text-white flex items-center">
-              <span className="flex w-8 h-8 mr-2 bg-cyscom/20 text-cyscom rounded-full items-center justify-center">
-                1
-              </span>
-              Department Selection
-            </h2>
-            <Link href="/dashboard" className="text-cyscom hover:text-cyscom/80 transition-colors">
-              Back to Dashboard
-            </Link>
-          </div>
-          
-          <div className="mb-6">
-            <WorkflowSteps currentStep={UserProgress.NEEDS_DEPARTMENTS} />
-          </div>
+        {/* Grid Pattern */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="h-full w-full" style={{
+            backgroundImage: `linear-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px),
+                             linear-gradient(90deg, rgba(255, 255, 255, 0.1) 1px, transparent 1px)`,
+            backgroundSize: '50px 50px'
+          }}></div>
+        </div>
 
-          <div className="p-4 bg-black/40 rounded-lg border border-cyscom/20 backdrop-blur-md mb-6">
-            <div className="flex items-start">
-              <div className="bg-cyscom/20 rounded-full p-2 mr-3">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-cyscom" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <div>
-                <h3 className="text-cyscom font-medium">Department Selection Guide</h3>
-                <ul className="mt-2 text-slate-300 text-sm space-y-1 list-disc pl-5">
-                  <li>You must choose exactly <span className="text-white font-medium">2 departments</span></li>
-                  <li>Your selection will determine which projects you can join</li>
-                  <li>Selections are final and can only be changed by admins</li>
-                  <li>Some departments may be full - these cannot be selected</li>
-                </ul>
-              </div>
+        <div className="relative z-10 container mx-auto px-6 py-20">
+          <div className="max-w-4xl mx-auto">
+            {/* Header */}
+            <div className="text-center mb-12">
+              <h1 className="text-5xl md:text-7xl font-bold bg-gradient-to-r from-white via-cyberblue-300 to-cyscom bg-clip-text text-transparent mb-4">
+                Department
+              </h1>
+              <p className="text-xl md:text-2xl text-cyberblue-400 font-light">
+                Select Your Department
+              </p>
             </div>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {departments.map(d=> (
-              <div 
-                key={d.deptId} 
-                onClick={() => {
-                  if (!locked && !(d.capacity > 0 && d.filledCount >= d.capacity && !selected.includes(d.deptId))) {
-                    toggle(d.deptId)
-                  }
-                }}
-                className={`p-4 rounded group transition-all duration-300 cursor-pointer relative
-                  ${selected.includes(d.deptId) 
-                    ? 'bg-gradient-to-r from-black/40 to-cyscom/20 border border-cyscom'
-                    : 'bg-black/30 hover:bg-black/40 border border-transparent'}
-                  ${(!selected.includes(d.deptId) && d.capacity > 0 && d.filledCount >= d.capacity) 
+            {/* Department Selection */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+              {departments.map(d => (
+                <div 
+                  key={d.deptId} 
+                  onClick={() => {
+                    if (!locked && !(d.capacity > 0 && d.filledCount >= d.capacity && !selected.includes(d.deptId))) {
+                      toggle(d.deptId)
+                    }
+                  }}
+                  className={`group relative p-8 bg-black/40 backdrop-blur-xl border rounded-2xl cursor-pointer transition-all duration-300 transform hover:scale-105 ${
+                    selected.includes(d.deptId) 
+                      ? 'border-cyscom shadow-2xl shadow-cyscom/25' 
+                      : 'border-cyberblue-900/50 hover:border-cyberblue-700/70'
+                  } ${(!selected.includes(d.deptId) && d.capacity > 0 && d.filledCount >= d.capacity) 
                     ? 'opacity-60 cursor-not-allowed' 
-                    : ''}
-                `}
-              >
-                {selected.includes(d.deptId) && (
-                  <div className="absolute -top-1 -right-1 w-6 h-6 bg-cyscom rounded-full flex items-center justify-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-black" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                )}
-                
-                <div className="flex justify-between items-center">
-                  <div>
-                    <h4 className="text-white font-medium text-lg flex items-center">
-                      {d.name}
-                    </h4>
-                    <div className="text-sm text-slate-300 mt-2">
-                      <div className="w-full bg-black/50 rounded-full h-1.5 relative">
-                        <div 
-                          className="absolute top-0 left-0 h-1.5 rounded-full bg-cyscom"
-                          style={{ width: d.capacity ? `${(d.filledCount / d.capacity) * 100}%` : '0%' }}
-                        ></div>
-                      </div>
-                      <div className="flex justify-between items-center mt-1">
-                        <span>
-                          {d.capacity > 0 && d.filledCount >= d.capacity ? (
-                            <span className="text-red-400">Full</span>
-                          ) : (
-                            <span>{d.filledCount}/{d.capacity || '∞'} seats</span>
-                          )}
-                        </span>
-                        {d.capacity > 0 && (
-                          <span className="text-xs text-slate-400">
-                            {Math.round((d.filledCount / d.capacity) * 100)}% filled
-                          </span>
-                        )}
-                      </div>
+                    : ''}`}
+                >
+                  {selected.includes(d.deptId) && (
+                    <div className="absolute -top-2 -right-2 w-8 h-8 bg-cyscom rounded-full flex items-center justify-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-black" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                  )}
+                  
+                  <div className="text-center">
+                    <h3 className="text-2xl font-bold text-white mb-4">{d.name}</h3>
+                    
+                    <div className="text-cyberblue-300/70 mb-4">
+                      {d.capacity > 0 && d.filledCount >= d.capacity ? (
+                        <span className="text-red-400 font-semibold">FULL</span>
+                      ) : (
+                        <span>{d.filledCount}/{d.capacity || '∞'} members</span>
+                      )}
+                    </div>
+                    
+                    <div className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-semibold ${
+                      selected.includes(d.deptId) 
+                        ? 'bg-cyscom text-black'
+                        : d.capacity > 0 && d.filledCount >= d.capacity
+                          ? 'bg-red-900/50 text-red-400 border border-red-700/50'
+                          : 'bg-cyberblue-950/50 text-cyberblue-400 border border-cyberblue-700/50'
+                    }`}>
+                      {selected.includes(d.deptId) ? 'Selected' : 
+                      d.capacity > 0 && d.filledCount >= d.capacity ? 'Unavailable' : 'Available'}
                     </div>
                   </div>
-                  
-                  <div className={`px-3 py-1 rounded-full text-sm border ${
-                    selected.includes(d.deptId) 
-                      ? 'border-red-500/30 text-red-400'
-                      : d.capacity > 0 && d.filledCount >= d.capacity
-                        ? 'border-gray-500/30 text-gray-400'
-                        : 'border-cyscom/30 text-cyscom group-hover:border-cyscom/60 transition-colors'
-                  }`}>
-                    {selected.includes(d.deptId) ? 'Selected' : 
-                    d.capacity > 0 && d.filledCount >= d.capacity ? 'Full' : 'Select'}
-                  </div>
                 </div>
-                
-                {selected.includes(d.deptId) && (
-                  <div className="mt-3 text-xs text-red-400 flex items-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                    </svg>
-                    Click to deselect
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
 
-          <div className="mt-8 flex items-center justify-between">
-            <Link href="/dashboard" className="px-4 py-2 rounded bg-black/30 text-white border border-white/10 hover:bg-black/40 transition-colors">
-              Back to Dashboard
-            </Link>
-            <div>
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mt-12">
+              <Link 
+                href="/dashboard" 
+                className="px-8 py-4 border border-cyberblue-700/50 text-cyberblue-400 font-semibold rounded-xl hover:border-cyberblue-500 hover:bg-cyberblue-950/20 transition-all duration-300 backdrop-blur-sm"
+              >
+                Back to Dashboard
+              </Link>
+              
               <button 
                 onClick={confirm} 
-                disabled={locked || loading || selected.length !== 2} 
-                className="px-6 py-2 rounded relative overflow-hidden group
-                  transition-all duration-300 transform
-                  disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed
-                  bg-cyscom hover:bg-cyscom/90 text-black"
+                disabled={locked || loading || selected.length !== 1} 
+                className="group relative px-8 py-4 bg-gradient-to-r from-cyberblue-600 to-cyberblue-500 text-black font-semibold rounded-xl hover:shadow-2xl hover:shadow-cyberblue-500/25 transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
               >
-                {loading ? (
-                  <div className="flex items-center">
-                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Processing...
-                  </div>
-                ) : locked ? (
-                  <span>Selections Confirmed</span>
-                ) : (
-                  <span>Confirm Selection{selected.length !== 2 ? ` (${selected.length}/2)` : ''}</span>
-                )}
-                {!loading && !locked && selected.length === 2 && (
-                  <span className="absolute right-0 top-0 h-full w-10 bg-white/10 transform -skew-x-20 transition-all 
-                    duration-700 -translate-x-20 group-hover:translate-x-40"></span>
+                <span className="relative z-10">
+                  {loading ? 'Processing...' : locked ? 'Selection Confirmed' : 'Confirm Selection'}
+                </span>
+                {!loading && !locked && selected.length === 1 && (
+                  <div className="absolute inset-0 bg-gradient-to-r from-cyberblue-500 to-cyberblue-400 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                 )}
               </button>
-              
-              {locked && (
-                <div className="mt-3 flex items-center text-sm text-slate-300">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+            </div>
+
+            {/* Status Messages */}
+            {locked && (
+              <div className="text-center mt-6">
+                <div className="inline-flex items-center px-4 py-2 bg-yellow-900/20 border border-yellow-700/50 text-yellow-400 rounded-full text-sm">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
                   </svg>
-                  Your selections are locked. Contact an admin to change.
+                  Selection is locked. Contact admin to change.
                 </div>
-              )}
-              
-              {!locked && selected.length > 0 && selected.length < 2 && (
-                <div className="mt-3 text-sm text-yellow-400 flex items-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+              </div>
+            )}
+            
+            {!locked && selected.length !== 1 && (
+              <div className="text-center mt-6">
+                <div className="inline-flex items-center px-4 py-2 bg-yellow-900/20 border border-yellow-700/50 text-yellow-400 rounded-full text-sm">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                   </svg>
-                  Please select {2 - selected.length} more department{selected.length === 1 ? '' : 's'}
+                  Please select exactly 1 department
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

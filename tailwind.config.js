@@ -6,18 +6,18 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        cyscom: '#00B4D8',
+        cyscom: '#FFFFFF',
         pagebg: '#0D1117',
         cyberblue: {
-          100: '#E0FBFC',
-          200: '#BEF8FD',
-          300: '#8AECF7',
-          400: '#48D7EB',
-          500: '#00B4D8',
-          600: '#0098B7',
-          700: '#007090',
-          800: '#005566',
-          900: '#003B47'
+          100: '#F8F9FA',
+          200: '#E9ECEF',
+          300: '#DEE2E6',
+          400: '#CED4DA',
+          500: '#ADB5BD',
+          600: '#6C757D',
+          700: '#495057',
+          800: '#343A40',
+          900: '#212529'
         },
         cyberdark: {
           700: '#1A2130',
@@ -41,8 +41,8 @@ module.exports = {
           '50%': { transform: 'translateY(-10px)' }
         },
         glow: {
-          '0%': { boxShadow: '0 0 5px rgba(0, 180, 216, 0.3)' },
-          '100%': { boxShadow: '0 0 20px rgba(0, 180, 216, 0.7)' }
+          '0%': { boxShadow: '0 0 5px rgba(255, 255, 255, 0.3)' },
+          '100%': { boxShadow: '0 0 20px rgba(255, 255, 255, 0.7)' }
         }
       },
     },
