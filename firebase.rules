@@ -1,0 +1,52 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isCollege() {
+      return request.auth != null && request.auth.token.email.matches('.*@vitstudent\\.ac\\.in')
+    }
+
+    // users: members can read all users, write only their own user doc (except role)
+    match /users/{userId} {
+      allow read: if isCollege();
+      allow create: if isCollege() && request.auth.uid == userId;
+      allow update: if isCollege() && request.auth.uid == userId && !(request.resource.data.role is string && request.resource.data.role != resource.data.role);
+      // admins should be able to update role via admin UI (handled elsewhere)
+    }
+
+    // contributions: owner can create, read; admins can update status and points
+    match /contributions/{contribId} {
+      allow create: if isCollege() && request.auth.uid == request.resource.data.userId;
+      allow read: if isCollege();
+      allow update: if isCollege() && (
+        request.auth.uid == resource.data.userId ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin','superadmin']
+      );
+    }
+
+    // projects: members can read; join/leave handled by updating documents via functions or client with proper checks
+    match /projects/{projectId} {
+      allow read: if isCollege();
+      allow update: if isCollege() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin','superadmin'];
+      allow create, delete: if isCollege() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'superadmin';
+    }
+
+    // reviews: members can create their own reviews, admins can read
+    match /reviews/{reviewId} {
+      allow create: if isCollege() && request.auth.uid == request.resource.data.userId;
+      allow read: if isCollege();
+      allow update, delete: if isCollege() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin','superadmin'];
+    }
+
+    // departments: read for all, updates by admin/superadmin only
+    match /departments/{deptId} {
+      allow read: if isCollege();
+      allow update: if isCollege() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin','superadmin'];
+      allow create, delete: if isCollege() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'superadmin';
+    }
+
+    // fallback: deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

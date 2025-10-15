@@ -1,0 +1,75 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root{
+  --bg: #0D1117;
+  --accent: #00B4D8;
+  --text: #E6E6E6;
+  --accent-glow: rgba(0, 180, 216, 0.5);
+}
+
+html,body,#__next{height:100%;}
+body{
+  @apply bg-[var(--bg)] text-[var(--text)] antialiased;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+}
+
+.container{max-width:1100px;margin:0 auto;padding:1rem}
+
+/* Cyber-themed scrollbar */
+.cyber-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.cyber-scrollbar::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+.cyber-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--accent);
+  border-radius: 3px;
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+
+.cyber-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 180, 216, 0.8);
+}
+
+/* Analytics chart animations */
+.cyber-bar-animation {
+  transition: width 1s ease-out;
+}
+
+.cyber-pie-chart {
+  transition: transform 0.3s ease-out;
+}
+
+.cyber-pie-chart:hover {
+  transform: scale(1.05);
+}
+
+@keyframes growWidth {
+  from { width: 0%; }
+  to { width: 100%; }
+}
+
+@keyframes glowPulse {
+  0% { box-shadow: 0 0 2px var(--accent-glow); }
+  100% { box-shadow: 0 0 8px var(--accent-glow), 0 0 12px var(--accent-glow); }
+}
+
+/* Cyber-themed cards */
+.cyber-card {
+  @apply bg-black/30 rounded-lg p-4 border border-cyscom/20;
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.3), 0 0 5px rgba(0, 180, 216, 0.2);
+  transition: all 0.3s ease;
+}
+
+.cyber-card:hover {
+  @apply border-cyscom/40;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.4), 0 0 10px rgba(0, 180, 216, 0.4);
+  transform: translateY(-2px);
+}

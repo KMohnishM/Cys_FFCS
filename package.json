@@ -1,0 +1,41 @@
+{
+  "name": "cyscom-ffcs-portal",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "seed": "ts-node --project tsconfig.scripts.json ./scripts/seed.ts",
+    "setup-admin": "ts-node --project tsconfig.scripts.json ./scripts/setup-admin.ts",
+    "setup-admin-client": "node ./scripts/setup-admin-client.js",
+    "update-departments": "ts-node --project tsconfig.scripts.json ./scripts/update-departments.ts",
+    "update-departments-client": "node ./scripts/update-departments-client.js",
+    "add-projects": "ts-node --project tsconfig.scripts.json ./scripts/add-projects.ts",
+    "add-projects-client": "node ./scripts/add-projects-client.js",
+    "firebase:emulators": "firebase emulators:start",
+    "firebase:deploy": "firebase deploy",
+    "firebase:rules": "firebase deploy --only firestore:rules,storage:rules"
+  },
+  "dependencies": {
+    "dotenv": "^16.6.1",
+    "firebase": "^10.11.0",
+    "firebase-admin": "^11.10.0",
+    "next": "14.0.0",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "swr": "^2.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.2.0",
+    "autoprefixer": "^10.4.14",
+    "eslint": "^8.47.0",
+    "eslint-config-next": "^14.0.0",
+    "postcss": "^8.4.24",
+    "tailwindcss": "^3.4.7",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.0.4"
+  }
+}

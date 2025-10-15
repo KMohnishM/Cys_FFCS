@@ -1,0 +1,30 @@
+# Cyscom FFCS Portal — Starter
+
+This repository is a starter scaffold for the Cyscom FFCS Portal (Next.js + TypeScript + Tailwind + Firebase).
+
+What’s included:
+- Next.js app (TypeScript)
+- Tailwind CSS
+- Firebase client helper (`lib/firebase.ts`)
+- Placeholder pages: login, dashboard, projects, contributions, leaderboard, admin
+- Firestore data types in `types/`
+- Firebase security rules example: `firebase.rules`
+- Seed script skeleton: `scripts/seed.ts`
+
+Quick start
+1. Install dependencies
+
+```powershell
+npm install
+```
+
+2. Create a Firebase project and add web app credentials. Create a `.env.local` with values from your Firebase console matching `.env.example`.
+
+3. Run the dev server
+
+```powershell
+npm run dev
+```
+
+Notes
+- This scaffold contains placeholders and wiring. Next steps: implement auth UI, Firestore queries, Storage upload, and admin flows.
