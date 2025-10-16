@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { getAuthClient, getDbClient } from '../lib/firebase'
+import { getAuthClient, getDbClient, signOut } from '../lib/firebase'
 import { collection, query, onSnapshot, doc, updateDoc, deleteDoc, setDoc } from 'firebase/firestore'
 import type { Department, Project, User } from '../types'
 
@@ -92,7 +92,24 @@ export default function SuperAdmin(){
   return (
     <div className="min-h-screen p-8 container mx-auto">
       <div className="max-w-6xl mx-auto bg-pagebg/60 rounded-xl p-6 backdrop-blur-md shadow-lg">
-        <h2 className="text-2xl text-white font-semibold">Super Admin</h2>
+        {/* Header with Sign Out */}
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl text-white font-semibold">Super Admin</h2>
+          <button 
+            onClick={async () => {
+              try {
+                await signOut()
+                window.location.href = '/'
+              } catch (e) {
+                console.error('Sign out failed', e)
+                alert('Failed to sign out')
+              }
+            }}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+          >
+            Sign Out
+          </button>
+        </div>
         <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <h3 className="text-white font-medium">Departments</h3>

@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react'
-import { getAuthClient, getDbClient, getStorageClient } from '../lib/firebase'
-import { collection, query, where, onSnapshot, doc, runTransaction, updateDoc, getDocs } from 'firebase/firestore'
-import type { Contribution, User, Department } from '../types'
+import { getAuthClient, getDbClient, getStorageClient, signOut } from '../lib/firebase'
+import { collection, query, where, onSnapshot, doc, runTransaction, updateDoc, getDocs, setDoc, deleteDoc } from 'firebase/firestore'
+import { ref } from 'firebase/storage'
+import type { Contribution, User, Department, Project } from '../types'
 import AdminAnalytics from '../components/AdminAnalytics'
 import { trackEvent } from '../lib/analytics'
 
@@ -11,7 +12,8 @@ export default function Admin() {
   const [loadingIds, setLoadingIds] = useState<string[]>([])
   const [users, setUsers] = useState<User[]>([])
   const [departments, setDepartments] = useState<Department[]>([])
-  const [activeTab, setActiveTab] = useState<'analytics' | 'contributions' | 'users'>('analytics')
+  const [projects, setProjects] = useState<Project[]>([])
+  const [activeTab, setActiveTab] = useState<'analytics' | 'contributions' | 'users' | 'projects'>('analytics')
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -116,6 +118,29 @@ export default function Admin() {
         })
       })
       setDepartments(list)
+    })
+    return () => unsub()
+  }, [userRole])
+  
+  // Load projects
+  useEffect(() => {
+    if (typeof window === 'undefined' || userRole !== 'admin' && userRole !== 'superadmin') return
+    const db = getDbClient()
+    const col = collection(db, 'projects')
+    const q = query(col)
+    const unsub = onSnapshot(q, (snap) => {
+      const list: Project[] = []
+      snap.forEach((d) => {
+        const data = d.data() as any
+        list.push({
+          projectId: d.id,
+          name: data.name,
+          description: data.description,
+          members: data.members || [],
+          department: data.department || null
+        })
+      })
+      setProjects(list)
     })
     return () => unsub()
   }, [userRole])
@@ -304,7 +329,24 @@ export default function Admin() {
   return (
     <div className="min-h-screen p-8 container mx-auto">
       <div className="max-w-4xl mx-auto">
-        {/* Admin Tools Section */}
+        {/* Header with Sign Out */}
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-bold">Admin Panel</h2>
+          <button 
+            onClick={async () => {
+              try {
+                await signOut()
+                window.location.href = '/'
+              } catch (e) {
+                console.error('Sign out failed', e)
+                alert('Failed to sign out')
+              }
+            }}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+          >
+            Sign Out
+          </button>
+        </div>
         {userRole === 'superadmin' && (
           <div className="mb-6 bg-pagebg/60 rounded-xl p-6 backdrop-blur-md shadow-lg">
             <h2 className="text-2xl font-semibold text-white">Admin Tools</h2>
@@ -366,6 +408,12 @@ export default function Admin() {
             className={`px-4 py-2 ${activeTab === 'users' ? 'text-cyscom border-b-2 border-cyscom' : 'text-slate-400 hover:text-slate-300'}`}
           >
             Manage Users
+          </button>
+          <button 
+            onClick={() => setActiveTab('projects')} 
+            className={`px-4 py-2 ${activeTab === 'projects' ? 'text-cyscom border-b-2 border-cyscom' : 'text-slate-400 hover:text-slate-300'}`}
+          >
+            Project Management
           </button>
         </div>
         {/* Analytics Tab */}
@@ -505,6 +553,171 @@ export default function Admin() {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+        
+        {/* Projects Tab */}
+        {activeTab === 'projects' && (
+          <div className="bg-pagebg/60 rounded-xl p-6 backdrop-blur-md shadow-lg">
+            <h2 className="text-2xl font-semibold text-white">Project Management</h2>
+            <p className="text-slate-300 mt-2">Create new projects, manage existing ones, and approve join requests.</p>
+            
+            <div className="mt-6 space-y-6">
+              {/* Create New Project */}
+              <div className="p-4 bg-black/30 rounded-lg">
+                <h3 className="text-lg font-medium text-white mb-4">Create New Project</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">Project Name</label>
+                    <input
+                      type="text"
+                      id="new-project-name"
+                      className="w-full px-3 py-2 bg-black/20 text-white rounded-lg border border-slate-600 focus:border-cyscom focus:outline-none"
+                      placeholder="Enter project name"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">Department</label>
+                    <select
+                      id="new-project-dept"
+                      className="w-full px-3 py-2 bg-black/20 text-white rounded-lg border border-slate-600 focus:border-cyscom focus:outline-none"
+                    >
+                      <option value="">Select department</option>
+                      {departments.map(dept => (
+                        <option key={dept.deptId} value={dept.deptId}>{dept.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-slate-300 mb-2">Description</label>
+                  <textarea
+                    id="new-project-desc"
+                    rows={3}
+                    className="w-full px-3 py-2 bg-black/20 text-white rounded-lg border border-slate-600 focus:border-cyscom focus:outline-none"
+                    placeholder="Enter project description"
+                  ></textarea>
+                </div>
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-slate-300 mb-2">Project Files (optional)</label>
+                  <input
+                    type="file"
+                    id="new-project-files"
+                    multiple
+                    className="w-full px-3 py-2 bg-black/20 text-white rounded-lg border border-slate-600 focus:border-cyscom focus:outline-none"
+                  />
+                </div>
+                <div className="mt-4 flex justify-end">
+                  <button
+                    onClick={async () => {
+                      const name = (document.getElementById('new-project-name') as HTMLInputElement).value.trim()
+                      const dept = (document.getElementById('new-project-dept') as HTMLSelectElement).value
+                      const desc = (document.getElementById('new-project-desc') as HTMLTextAreaElement).value.trim()
+                      const files = (document.getElementById('new-project-files') as HTMLInputElement).files
+
+                      if (!name || !dept || !desc) {
+                        alert('Please fill in all required fields')
+                        return
+                      }
+
+                      try {
+                        const db = getDbClient()
+                        const projectId = name.toLowerCase().replace(/[^a-z0-9]/g, '-')
+                        const projectRef = doc(db, 'projects', projectId)
+                        
+                        // Upload files if any
+                        let fileUrls: string[] = []
+                        if (files && files.length > 0) {
+                          const storage = getStorageClient()
+                          for (let i = 0; i < files.length; i++) {
+                            const file = files[i]
+                            const fileRef = ref(storage, `projects/${projectId}/${file.name}`)
+                            const { uploadBytes, getDownloadURL } = await import('firebase/storage')
+                            await uploadBytes(fileRef, file)
+                            const url = await getDownloadURL(fileRef)
+                            fileUrls.push(url)
+                          }
+                        }
+
+                        await setDoc(projectRef, {
+                          name,
+                          description: desc,
+                          department: dept,
+                          members: [],
+                          fileUrls: fileUrls,
+                          createdAt: new Date(),
+                          createdBy: userRole
+                        })
+
+                        // Clear form
+                        ;(document.getElementById('new-project-name') as HTMLInputElement).value = ''
+                        ;(document.getElementById('new-project-dept') as HTMLSelectElement).value = ''
+                        ;(document.getElementById('new-project-desc') as HTMLTextAreaElement).value = ''
+                        ;(document.getElementById('new-project-files') as HTMLInputElement).value = ''
+
+                        alert('Project created successfully!')
+                      } catch (e) {
+                        console.error('Create project failed', e)
+                        alert('Failed to create project: ' + (e instanceof Error ? e.message : String(e)))
+                      }
+                    }}
+                    className="px-6 py-2 bg-cyscom text-black rounded-lg hover:bg-cyscom/90 transition-colors"
+                  >
+                    Create Project
+                  </button>
+                </div>
+              </div>
+              
+              {/* Existing Projects */}
+              <div className="p-4 bg-black/30 rounded-lg">
+                <h3 className="text-lg font-medium text-white mb-4">Existing Projects</h3>
+                <div className="space-y-4">
+                  {projects.length === 0 && <p className="text-slate-300">No projects found.</p>}
+                  {projects.map((project) => (
+                    <div key={project.projectId} className="p-4 bg-black/20 rounded-lg">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <h4 className="text-lg font-medium text-white">{project.name}</h4>
+                          <p className="text-slate-300 text-sm mt-1">{project.description}</p>
+                          <div className="flex items-center gap-4 mt-2 text-sm text-slate-400">
+                            <span>Department: {departments.find(d => d.deptId === project.department)?.name || project.department}</span>
+                            <span>Members: {project.members.length}/4</span>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              // Approve join requests functionality can be added here
+                              alert('Join request approval functionality to be implemented')
+                            }}
+                            className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 transition-colors text-sm"
+                          >
+                            Approve Requests
+                          </button>
+                          <button
+                            onClick={async () => {
+                              if (!confirm('Are you sure you want to delete this project?')) return
+                              
+                              try {
+                                const db = getDbClient()
+                                await deleteDoc(doc(db, 'projects', project.projectId))
+                                alert('Project deleted successfully')
+                              } catch (e) {
+                                console.error('Delete project failed', e)
+                                alert('Failed to delete project')
+                              }
+                            }}
+                            className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition-colors text-sm"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         )}

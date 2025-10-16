@@ -77,7 +77,7 @@ export default function useAuthGuard() {
         setUserRole(userData.role)
         
         // Check departments
-        if (!userData.departments || userData.departments.length < 2) {
+        if (!userData.departments || userData.departments.length < 1) {
           setUserProgress(UserProgress.NEEDS_DEPARTMENTS)
           
           // Redirect to departments page if trying to access a page that requires departments
