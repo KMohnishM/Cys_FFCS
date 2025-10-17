@@ -42,15 +42,18 @@ export default function Leaderboard(){
       const entries: LeaderboardEntry[] = []
       snapshot.forEach((doc) => {
         const data = doc.data() as any
-        entries.push({
-          userId: doc.id,
-          name: data.name || 'Anonymous',
-          email: data.email || '',
-          totalPoints: data.totalPoints || 0,
-          role: data.role || 'member',
-          departments: data.departments || [],
-          projectId: data.projectId
-        })
+        // Filter out admins and superadmins
+        if (data.role !== 'admin' && data.role !== 'superadmin') {
+          entries.push({
+            userId: doc.id,
+            name: data.name || 'Anonymous',
+            email: data.email || '',
+            totalPoints: data.totalPoints || 0,
+            role: data.role || 'member',
+            departments: data.departments || [],
+            projectId: data.projectId
+          })
+        }
       })
       setLeaderboard(entries)
       setLoading(false)

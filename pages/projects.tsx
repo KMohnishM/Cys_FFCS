@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { getAuthClient, getDbClient } from '../lib/firebase'
-import { collection, query, onSnapshot, doc, runTransaction } from 'firebase/firestore'
+import { collection, query, onSnapshot, doc, runTransaction, where, getDocs, addDoc, Timestamp, deleteDoc } from 'firebase/firestore'
 import type { Project } from '../types'
 import { UserProgress } from '../lib/useAuthGuard'
 import WorkflowSteps from '../components/WorkflowSteps'
@@ -13,6 +13,7 @@ export default function Projects(){
   const [userDepts, setUserDepts] = useState<string[]|null>(null)
   const [allProjects, setAllProjects] = useState<Project[]>([])
   const [userRole, setUserRole] = useState<string | null>(null)
+  const [pendingRequests, setPendingRequests] = useState<Set<string>>(new Set())
 
   useEffect(()=>{
     if(typeof window==='undefined') return
@@ -68,26 +69,94 @@ export default function Projects(){
     return ()=>unsub()
   },[])
 
-  const join = async(p:Project)=>{
+  // Track pending join requests
+  useEffect(() => {
+    if (!userId) return
+    const db = getDbClient()
+    const q = query(
+      collection(db, 'joinRequests'),
+      where('userId', '==', userId),
+      where('status', '==', 'pending')
+    )
+    const unsub = onSnapshot(q, (snap) => {
+      const projectIds = new Set<string>()
+      snap.forEach((doc) => {
+        const data = doc.data() as any
+        projectIds.add(data.projectId)
+      })
+      setPendingRequests(projectIds)
+    })
+    return () => unsub()
+  }, [userId])
+
+  const requestToJoin = async(p:Project)=>{
     if(!userId) return alert('Sign in required')
     const db = getDbClient()
     try{
-      await runTransaction(db, async(tx)=>{
-        // First, perform all reads
-        const pref = doc(db,'projects',p.projectId)
-        const psnap = await tx.get(pref)
-        const members = (psnap.data() as any).members || []
-        if(members.includes(userId)) return
-        if(members.length>=4) throw new Error('Project full')
-        
-        // Get user reference (no read needed here, just the reference)
-        const uref = doc(db,'users',userId)
-        
-        // Now perform all writes after all reads are complete
-        tx.update(pref,{members:[...members,userId]})
-        tx.update(uref,{projectId: p.projectId})
+      // Check if user already has a pending request
+      const existingRequests = await getDocs(query(
+        collection(db, 'joinRequests'),
+        where('userId', '==', userId),
+        where('projectId', '==', p.projectId),
+        where('status', '==', 'pending')
+      ))
+      
+      if (!existingRequests.empty) {
+        alert('You already have a pending join request for this project')
+        return
+      }
+      
+      // Check if user is already a member
+      if (p.members.includes(userId)) {
+        alert('You are already a member of this project')
+        return
+      }
+      
+      // Check if project is full
+      if (p.members.length >= 4) {
+        alert('Project is full')
+        return
+      }
+      
+      await addDoc(collection(db,'joinRequests'), {
+        userId,
+        projectId: p.projectId,
+        status: 'pending',
+        requestedAt: Timestamp.now()
       })
-    }catch(e:any){ alert(e.message||'Failed to join') }
+      
+      alert('Join request submitted successfully! An admin will review your request.')
+    }catch(e:any){ 
+      console.error('Failed to submit join request:', e)
+      alert('Failed to submit join request. Please try again.') 
+    }
+  }
+
+  const withdrawRequest = async (projectId: string) => {
+    if (!userId) return alert('Sign in required')
+    const db = getDbClient()
+    try {
+      // Find and delete the pending request
+      const requests = await getDocs(query(
+        collection(db, 'joinRequests'),
+        where('userId', '==', userId),
+        where('projectId', '==', projectId),
+        where('status', '==', 'pending')
+      ))
+      
+      if (requests.empty) {
+        alert('No pending request found')
+        return
+      }
+      
+      // Delete the request
+      await Promise.all(requests.docs.map(doc => deleteDoc(doc.ref)))
+      
+      alert('Join request withdrawn successfully!')
+    } catch (e: any) {
+      console.error('Failed to withdraw request:', e)
+      alert('Failed to withdraw request. Please try again.')
+    }
   }
 
   const leave = async(p:Project)=>{
@@ -227,9 +296,16 @@ export default function Projects(){
                           >
                             Leave Project
                           </button>
+                        ) : pendingRequests.has(p.projectId) ? (
+                          <button 
+                            onClick={() => withdrawRequest(p.projectId)} 
+                            className="flex-1 px-4 py-2 bg-yellow-600/50 text-yellow-400 border border-yellow-700/50 rounded-lg hover:bg-yellow-600/70 transition-colors text-sm font-semibold"
+                          >
+                            Withdraw Request
+                          </button>
                         ) : (
                           <button 
-                            onClick={() => join(p)} 
+                            onClick={() => requestToJoin(p)} 
                             disabled={p.members.length >= 4}
                             className={`flex-1 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
                               p.members.length >= 4 
@@ -237,7 +313,7 @@ export default function Projects(){
                                 : 'bg-gradient-to-r from-cyberblue-600 to-cyberblue-500 text-black hover:shadow-lg hover:shadow-cyberblue-500/25 transform hover:scale-105'
                             }`}
                           >
-                            {p.members.length >= 4 ? 'Project Full' : 'Join Project'}
+                            {p.members.length >= 4 ? 'Project Full' : 'Request to Join'}
                           </button>
                         )}
                       </div>

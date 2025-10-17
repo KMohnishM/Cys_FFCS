@@ -1,7 +1,7 @@
 import { useRouter } from 'next/router'
 import { useEffect, useState } from 'react'
 import { getDbClient, getAuthClient } from '../../lib/firebase'
-import { doc, getDoc, collection, query, onSnapshot, addDoc, Timestamp } from 'firebase/firestore'
+import { doc, getDoc, collection, query, onSnapshot, addDoc, Timestamp, where, getDocs, deleteDoc } from 'firebase/firestore'
 import Link from 'next/link'
 
 export default function ProjectPage(){
@@ -15,6 +15,8 @@ export default function ProjectPage(){
   const [comment, setComment] = useState('')
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [hasPendingRequest, setHasPendingRequest] = useState(false)
+  const [requesting, setRequesting] = useState(false)
 
   useEffect(()=>{
     if(typeof window==='undefined') return
@@ -85,6 +87,17 @@ export default function ProjectPage(){
     })()
   },[project])
 
+  useEffect(()=>{
+    if(!userId || !id) return
+    const db = getDbClient()
+    const joinRequestsRef = collection(db, 'joinRequests')
+    const q = query(joinRequestsRef, where('userId', '==', userId), where('projectId', '==', id), where('status', '==', 'pending'))
+    const unsub = onSnapshot(q, (snapshot) => {
+      setHasPendingRequest(!snapshot.empty)
+    })
+    return () => unsub()
+  }, [userId, id])
+
   // Function to get department name from ID
   const getDepartmentName = (deptId: string | null): string => {
     if (!deptId) return "Unassigned";
@@ -124,6 +137,58 @@ export default function ProjectPage(){
       alert('Failed to submit review. Please try again.');
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  const requestToJoin = async () => {
+    if(!userId) return alert('Sign in required');
+    if(!project) return;
+    if(hasPendingRequest) return alert('You already have a pending request');
+    if((project.members||[]).includes(userId)) return alert('You are already a member');
+
+    setRequesting(true);
+    try {
+      const db = getDbClient();
+      await addDoc(collection(db,'joinRequests'), {
+        userId,
+        projectId: project.projectId,
+        status: 'pending',
+        requestedAt: Timestamp.now()
+      });
+      alert('Join request submitted successfully!');
+    } catch (error) {
+      console.error("Error submitting join request:", error);
+      alert('Failed to submit join request. Please try again.');
+    } finally {
+      setRequesting(false);
+    }
+  }
+
+  const withdrawRequest = async () => {
+    if (!userId) return alert('Sign in required');
+    if (!project) return;
+    const db = getDbClient();
+    try {
+      // Find and delete the pending request
+      const requests = await getDocs(query(
+        collection(db, 'joinRequests'),
+        where('userId', '==', userId),
+        where('projectId', '==', project.projectId),
+        where('status', '==', 'pending')
+      ))
+      
+      if (requests.empty) {
+        alert('No pending request found')
+        return
+      }
+      
+      // Delete the request
+      await Promise.all(requests.docs.map(doc => deleteDoc(doc.ref)))
+      
+      alert('Join request withdrawn successfully!')
+    } catch (error) {
+      console.error("Error withdrawing join request:", error);
+      alert('Failed to withdraw join request. Please try again.');
     }
   }
 
@@ -235,7 +300,40 @@ export default function ProjectPage(){
             </div>
           ) : (
             <div className="mt-3 p-4 bg-black/20 rounded text-center">
-              <p className="text-slate-300">Join this project to submit contributions</p>
+              <p className="text-slate-300 mb-4">Join this project to submit contributions</p>
+              {!isMember && userId && (
+                <div>
+                  {hasPendingRequest ? (
+                    <div className="space-y-3">
+                      <div className="text-yellow-400 text-sm">Your join request is pending approval</div>
+                      <button 
+                        onClick={withdrawRequest} 
+                        className="px-6 py-2 bg-yellow-600/50 text-yellow-400 border border-yellow-700/50 rounded hover:bg-yellow-600/70 transition-colors"
+                      >
+                        Withdraw Request
+                      </button>
+                    </div>
+                  ) : (
+                    <button 
+                      onClick={requestToJoin} 
+                      disabled={requesting}
+                      className={`px-6 py-2 rounded flex items-center mx-auto ${
+                        requesting 
+                          ? 'bg-gray-600 text-gray-300 cursor-not-allowed' 
+                          : 'bg-cyscom text-black hover:bg-cyscom/90 transition-colors'
+                      }`}
+                    >
+                      {requesting && (
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                      )}
+                      Request to Join Project
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
