@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { getAuthClient, getDbClient, getStorageClient, signOut } from '../lib/firebase'
-import { collection, query, where, onSnapshot, doc, runTransaction, updateDoc, getDocs, setDoc, deleteDoc } from 'firebase/firestore'
+import { collection, query, where, onSnapshot, doc, runTransaction, updateDoc, getDocs, setDoc, deleteDoc, getDoc, Timestamp } from 'firebase/firestore'
 import { ref } from 'firebase/storage'
 import type { Contribution, User, Department, Project } from '../types'
 import AdminAnalytics from '../components/AdminAnalytics'
@@ -14,9 +14,10 @@ export default function Admin() {
   const [users, setUsers] = useState<User[]>([])
   const [departments, setDepartments] = useState<Department[]>([])
   const [projects, setProjects] = useState<Project[]>([])
-  const [activeTab, setActiveTab] = useState<'analytics' | 'contributions' | 'users' | 'projects'>('analytics')
+  const [activeTab, setActiveTab] = useState<'analytics' | 'contributions' | 'users' | 'projects' | 'join-requests'>('analytics')
   const [viewerUrl, setViewerUrl] = useState<string | null>(null)
   const [viewerZoom, setViewerZoom] = useState<number>(1)
+  const [joinRequests, setJoinRequests] = useState<any[]>([])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -150,6 +151,33 @@ export default function Admin() {
         })
       })
       setProjects(list)
+    })
+    return () => unsub()
+  }, [userRole])
+
+  // Load join requests
+  useEffect(() => {
+    if (typeof window === 'undefined' || userRole !== 'admin' && userRole !== 'superadmin') return
+    const db = getDbClient()
+    const col = collection(db, 'joinRequests')
+    const q = query(col, where('status', '==', 'pending'))
+    const unsub = onSnapshot(q, async (snap) => {
+      const list: any[] = []
+      for (const d of snap.docs) {
+        const data = d.data() as any
+        // Get user and project details
+        const userSnap = await getDoc(doc(db, 'users', data.userId))
+        const projectSnap = await getDoc(doc(db, 'projects', data.projectId))
+        if (userSnap.exists() && projectSnap.exists()) {
+          list.push({
+            requestId: d.id,
+            ...data,
+            user: { userId: userSnap.id, ...userSnap.data() },
+            project: { projectId: projectSnap.id, ...projectSnap.data() }
+          })
+        }
+      }
+      setJoinRequests(list)
     })
     return () => unsub()
   }, [userRole])
@@ -326,6 +354,68 @@ export default function Admin() {
     }
   }
 
+  const approveJoinRequest = async (requestId: string, userId: string, projectId: string) => {
+    const db = getDbClient()
+    setLoading(requestId, true)
+    try {
+      await runTransaction(db, async (tx) => {
+        // Get the request
+        const requestRef = doc(db, 'joinRequests', requestId)
+        const requestSnap = await tx.get(requestRef)
+        if (!requestSnap.exists()) throw new Error('Request not found')
+        const requestData = requestSnap.data() as any
+        if (requestData.status !== 'pending') throw new Error('Request already processed')
+
+        // Get the project
+        const projectRef = doc(db, 'projects', projectId)
+        const projectSnap = await tx.get(projectRef)
+        if (!projectSnap.exists()) throw new Error('Project not found')
+        const projectData = projectSnap.data() as any
+        const members = projectData.members || []
+        if (members.length >= 4) throw new Error('Project is full')
+        if (members.includes(userId)) throw new Error('User is already a member')
+
+        // Update project members
+        tx.update(projectRef, { members: [...members, userId] })
+
+        // Update request status
+        tx.update(requestRef, { 
+          status: 'approved', 
+          reviewedBy: userRole, 
+          reviewedAt: Timestamp.now() 
+        })
+
+        // Update user projectId
+        const userRef = doc(db, 'users', userId)
+        tx.update(userRef, { projectId })
+      })
+      alert('Join request approved!')
+    } catch (e) {
+      console.error('Approve join request failed', e)
+      alert('Failed to approve: ' + (e instanceof Error ? e.message : String(e)))
+    } finally {
+      setLoading(requestId, false)
+    }
+  }
+
+  const rejectJoinRequest = async (requestId: string) => {
+    const db = getDbClient()
+    setLoading(requestId, true)
+    try {
+      await updateDoc(doc(db, 'joinRequests', requestId), { 
+        status: 'rejected', 
+        reviewedBy: userRole, 
+        reviewedAt: Timestamp.now() 
+      })
+      alert('Join request rejected!')
+    } catch (e) {
+      console.error('Reject join request failed', e)
+      alert('Failed to reject')
+    } finally {
+      setLoading(requestId, false)
+    }
+  }
+
   if (userRole !== 'admin' && userRole !== 'superadmin') {
     return (
       <div className="min-h-screen p-8 container">
@@ -423,6 +513,12 @@ export default function Admin() {
             className={`px-4 py-2 ${activeTab === 'projects' ? 'text-cyscom border-b-2 border-cyscom' : 'text-slate-400 hover:text-slate-300'}`}
           >
             Project Management
+          </button>
+          <button 
+            onClick={() => setActiveTab('join-requests')} 
+            className={`px-4 py-2 ${activeTab === 'join-requests' ? 'text-cyscom border-b-2 border-cyscom' : 'text-slate-400 hover:text-slate-300'}`}
+          >
+            Join Requests ({joinRequests.length})
           </button>
         </div>
         {/* Analytics Tab */}
@@ -761,6 +857,53 @@ export default function Admin() {
                   ))}
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Join Requests Tab */}
+        {activeTab === 'join-requests' && (
+          <div className="bg-pagebg/60 rounded-xl p-6 backdrop-blur-md shadow-lg">
+            <h2 className="text-2xl font-semibold text-white">Join Requests</h2>
+            <p className="text-slate-300 mt-2">Approve or reject pending project join requests.</p>
+            
+            <div className="mt-6 space-y-4">
+              {joinRequests.length === 0 && <p className="text-slate-300">No pending join requests.</p>}
+              {joinRequests.map((request) => (
+                <div key={request.requestId} className="p-4 rounded bg-black/30">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <h4 className="text-lg font-medium text-white">{request.user.name}</h4>
+                        <span className="px-2 py-1 bg-yellow-600/20 text-yellow-400 text-xs rounded">Pending</span>
+                      </div>
+                      <p className="text-slate-300 text-sm mb-2">{request.user.email}</p>
+                      <p className="text-slate-400 text-sm">
+                        Requested to join: <span className="text-cyscom">{request.project.name}</span>
+                      </p>
+                      <p className="text-slate-500 text-xs mt-1">
+                        Requested at: {request.requestedAt?.toDate().toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => approveJoinRequest(request.requestId, request.userId, request.projectId)}
+                        disabled={loadingIds.includes(request.requestId)}
+                        className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors disabled:opacity-50"
+                      >
+                        {loadingIds.includes(request.requestId) ? 'Processing...' : 'Approve'}
+                      </button>
+                      <button
+                        onClick={() => rejectJoinRequest(request.requestId)}
+                        disabled={loadingIds.includes(request.requestId)}
+                        className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors disabled:opacity-50"
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}

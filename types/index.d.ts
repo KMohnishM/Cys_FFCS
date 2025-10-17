@@ -38,3 +38,13 @@ export interface Contribution {
   verifiedAt?: any
   createdAt?: any
 }
+
+export interface JoinRequest {
+  requestId: string
+  userId: string
+  projectId: string
+  status: 'pending' | 'approved' | 'rejected'
+  requestedAt: any
+  reviewedBy?: string
+  reviewedAt?: any
+}
