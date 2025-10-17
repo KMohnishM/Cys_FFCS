@@ -8,12 +8,15 @@ import { trackEvent } from '../lib/analytics'
 
 export default function Admin() {
   const [userRole, setUserRole] = useState<string | null>(null)
-  const [pending, setPending] = useState<Contribution[]>([])
+  const [contributions, setContributions] = useState<Contribution[]>([])
+  const [contribFilter, setContribFilter] = useState<'pending'|'all'|'verified'|'rejected'>('pending')
   const [loadingIds, setLoadingIds] = useState<string[]>([])
   const [users, setUsers] = useState<User[]>([])
   const [departments, setDepartments] = useState<Department[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [activeTab, setActiveTab] = useState<'analytics' | 'contributions' | 'users' | 'projects'>('analytics')
+  const [viewerUrl, setViewerUrl] = useState<string | null>(null)
+  const [viewerZoom, setViewerZoom] = useState<number>(1)
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -49,13 +52,19 @@ export default function Admin() {
     })
 
     return () => unsubAuth()
-  }, [])
+  }, [contribFilter])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
     const db = getDbClient()
     const col = collection(db, 'contributions')
-    const q = query(col, where('status', '==', 'pending'))
+    // build query based on filter
+    let q
+    if (contribFilter === 'all') {
+      q = query(col)
+    } else {
+      q = query(col, where('status', '==', contribFilter))
+    }
     const unsub = onSnapshot(q, (snap) => {
       const list: Contribution[] = []
       snap.forEach((d) => {
@@ -70,7 +79,7 @@ export default function Admin() {
           pointsAwarded: data.pointsAwarded,
         })
       })
-      setPending(list)
+      setContributions(list)
     })
     return () => unsub()
   }, [])
@@ -435,15 +444,49 @@ export default function Admin() {
             <p className="text-slate-300 mt-2">Approve or reject pending contributions and assign points.</p>
 
             <div className="mt-6 space-y-4">
-              {pending.length === 0 && <p className="text-slate-300">No pending contributions.</p>}
-              {pending.map((c) => (
+              <div className="flex items-center gap-4">
+                <h3 className="text-lg font-medium">Contributions</h3>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setContribFilter('pending')}
+                    className={`px-2 py-1 rounded ${contribFilter === 'pending' ? 'bg-sky-600 text-white' : 'bg-slate-100'}`}>
+                    Pending
+                  </button>
+                  <button
+                    onClick={() => setContribFilter('all')}
+                    className={`px-2 py-1 rounded ${contribFilter === 'all' ? 'bg-sky-600 text-white' : 'bg-slate-100'}`}>
+                    All
+                  </button>
+                  <button
+                    onClick={() => setContribFilter('verified')}
+                    className={`px-2 py-1 rounded ${contribFilter === 'verified' ? 'bg-sky-600 text-white' : 'bg-slate-100'}`}>
+                    Verified
+                  </button>
+                  <button
+                    onClick={() => setContribFilter('rejected')}
+                    className={`px-2 py-1 rounded ${contribFilter === 'rejected' ? 'bg-sky-600 text-white' : 'bg-slate-100'}`}>
+                    Rejected
+                  </button>
+                </div>
+              </div>
+
+              {contributions.length === 0 && <p className="text-slate-300">No contributions.</p>}
+              {contributions.map((c: Contribution) => (
                 <div key={c.contribId} className="p-3 rounded bg-black/30">
                   <div className="flex items-start gap-4">
                     <div className="flex-1">
                       <p className="text-slate-200">{c.text}</p>
                       {c.imageUrl && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={c.imageUrl} alt="contrib" className="mt-2 max-h-48 rounded" />
+                        <div className="mt-2">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={c.imageUrl} alt="contrib" className="max-h-48 rounded inline-block mr-2 border" />
+                          <button
+                            onClick={() => { setViewerUrl(c.imageUrl ?? null); setViewerZoom(1) }}
+                            className="px-2 py-1 bg-cyberblue-700 text-white rounded ml-2 text-sm"
+                          >
+                            View
+                          </button>
+                        </div>
                       )}
                     </div>
                     <div className="w-40 text-right">
@@ -725,6 +768,26 @@ export default function Admin() {
       
       {/* Include the admin tools script */}
       <script src="/js/admin-tools.js" async></script>
+      {/* Image viewer modal */}
+      {viewerUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+          <div className="relative max-w-4xl w-full mx-4">
+            <div className="bg-black/90 p-4 rounded-lg">
+              <div className="flex justify-between items-center mb-3">
+                <div className="flex gap-2">
+                  <button onClick={() => setViewerZoom((z) => Math.max(0.2, z - 0.2))} className="px-3 py-1 bg-slate-700 text-white rounded">-</button>
+                  <button onClick={() => setViewerZoom((z) => Math.min(4, z + 0.2))} className="px-3 py-1 bg-slate-700 text-white rounded">+</button>
+                  <a href={viewerUrl} download className="px-3 py-1 bg-slate-700 text-white rounded">Download</a>
+                </div>
+                <button onClick={() => setViewerUrl(null)} className="px-3 py-1 bg-red-600 text-white rounded">Close</button>
+              </div>
+              <div className="overflow-auto" style={{ maxHeight: '80vh' }}>
+                <img src={viewerUrl} alt="viewer" style={{ transform: `scale(${viewerZoom})`, transformOrigin: 'center top', display: 'block', margin: '0 auto' }} />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

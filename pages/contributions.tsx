@@ -20,13 +20,14 @@ import {
   updateDoc,
   getDoc
 } from 'firebase/firestore'
-import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage'
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage'
 import type { Contribution } from '../types'
 import Navigation from '../components/Navigation'
 
 export default function Contributions() {
   const router = useRouter()
   const { projectId } = router.query
+  const pid = Array.isArray(projectId) ? projectId[0] : projectId
   const [user, setUser] = useState<FirebaseUser | null>(null)
   const [text, setText] = useState('')
   const [file, setFile] = useState<File | null>(null)
@@ -34,6 +35,7 @@ export default function Contributions() {
   const [contribs, setContribs] = useState<Contribution[]>([])
   const [selectedProject, setSelectedProject] = useState<any>(null)
   const [userProjects, setUserProjects] = useState<any[]>([])
+  const [allProjects, setAllProjects] = useState<any[]>([])
   const [userRole, setUserRole] = useState<string | null>(null)
 
   useEffect(() => {
@@ -73,13 +75,13 @@ export default function Contributions() {
             const projectData = { id: projectSnap.id, ...projectSnap.data() }
             setUserProjects([projectData])
             
-            // If projectId is in URL and matches user's project, select it
-            if (projectId && projectId === projectSnap.id) {
-              setSelectedProject(projectData)
-            } else if (projectId === 'null' || !projectId) {
-              // If projectId is explicitly set to null or not provided
-              setSelectedProject(null)
-            }
+                // If projectId is in URL and matches user's project, select it
+                if (pid && pid === projectSnap.id) {
+                  setSelectedProject(projectData)
+                } else if (pid === 'null' || !pid) {
+                  // If projectId is explicitly set to null or not provided
+                  setSelectedProject(null)
+                }
           }
         }
       } catch (error) {
@@ -88,7 +90,25 @@ export default function Contributions() {
     }
 
     fetchUserProjects()
-  }, [user, projectId])
+  }, [user, pid])
+
+  // Load all projects irrespective of department so users can select any project
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const db = getDbClient()
+    const col = collection(db, 'projects')
+    const unsub = onSnapshot(col, (snap) => {
+      const list: any[] = []
+      snap.forEach((d) => {
+        const data = d.data() as any
+        list.push({ id: d.id, ...data })
+      })
+      setAllProjects(list)
+    }, (err) => {
+      console.error('Failed to load projects', err)
+    })
+    return () => unsub()
+  }, [])
 
   useEffect(() => {
     if (!user) {
@@ -172,21 +192,52 @@ export default function Contributions() {
     try {
       let imageUrl: string | undefined = undefined
       if (file) {
-        const storage = getStorageClient()
-        const path = `contributions/${user.uid}/${Date.now()}_${file.name}`
-        const sRef = storageRef(storage, path)
-        const uploadTask = uploadBytesResumable(sRef, file)
-        await new Promise<void>((resolve, reject) => {
-          uploadTask.on(
-            'state_changed',
-            () => {},
-            (err) => reject(err),
-            async () => {
-              imageUrl = await getDownloadURL(uploadTask.snapshot.ref)
-              resolve()
+        // Client-side guard: prevent too-large uploads for UX
+        const MAX_BYTES = 5 * 1024 * 1024
+        if (file.size > MAX_BYTES) {
+          alert('Image must be smaller than 5 MB')
+          setLoading(false)
+          return
+        }
+
+        // Resize & compress to reduce storage/bandwidth (max width 1024)
+        const toDataUrl = (file: File, maxWidth = 1024, quality = 0.8): Promise<{ dataUrl: string; name: string }> => {
+          return new Promise((resolve, reject) => {
+            const img = new Image()
+            const reader = new FileReader()
+            reader.onload = () => {
+              img.onload = () => {
+                const canvas = document.createElement('canvas')
+                const scale = Math.min(1, maxWidth / img.width)
+                canvas.width = Math.round(img.width * scale)
+                canvas.height = Math.round(img.height * scale)
+                const ctx = canvas.getContext('2d')!
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+                // choose webp if available
+                const dataUrl = canvas.toDataURL('image/jpeg', quality)
+                resolve({ dataUrl, name: file.name.replace(/\s+/g, '_') })
+              }
+              if (typeof reader.result === 'string') img.src = reader.result
             }
-          )
+            reader.onerror = (e) => reject(e)
+            reader.readAsDataURL(file)
+          })
+        }
+
+        const { dataUrl, name } = await toDataUrl(file, 1024, 0.78)
+
+        // POST to local API route that saves to public/uploads
+        const res = await fetch('/api/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename: `${user.uid}_${Date.now()}_${name}`, dataUrl }),
         })
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: 'upload failed' }))
+          throw new Error(err.error || 'Upload failed')
+        }
+        const json = await res.json()
+        imageUrl = json.url
       }
 
   const db = getDbClient()
@@ -257,6 +308,27 @@ export default function Contributions() {
                       {selectedProject 
                         ? `Adding contribution for: ${selectedProject.name}` 
                         : "You can add contributions for your project or general contributions"}
+                    </div>
+                    <div className="ml-4">
+                      <label className="text-sm text-slate-300 mr-2">Select Project:</label>
+                      <select value={selectedProject?.id ?? 'none'} onChange={(e) => {
+                        const val = e.target.value
+                        if (val === 'none') {
+                          setSelectedProject(null)
+                          router.push('/contributions?projectId=null')
+                        } else {
+                          const p = allProjects.find(ap => ap.id === val)
+                          if (p) {
+                            setSelectedProject(p)
+                            router.push(`/contributions?projectId=${p.id}`)
+                          }
+                        }
+                      }} className="bg-black/20 text-white rounded p-2">
+                        <option value="none">-- None --</option>
+                        {allProjects.map(p => (
+                          <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                      </select>
                     </div>
                     <div className="flex gap-2">
                       {selectedProject && (

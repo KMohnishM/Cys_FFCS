@@ -11,6 +11,7 @@ export default function Projects(){
   const [projects, setProjects] = useState<Project[]>([])
   const [userId, setUserId] = useState<string|null>(null)
   const [userDepts, setUserDepts] = useState<string[]|null>(null)
+  const [allProjects, setAllProjects] = useState<Project[]>([])
   const [userRole, setUserRole] = useState<string | null>(null)
 
   useEffect(()=>{
@@ -61,17 +62,11 @@ export default function Projects(){
           department: data.department || null
         } as Project & any)
       })
-      
-      // Filter projects by user departments
-      if(userDepts && userDepts.length > 0){
-        const filteredProjects = list.filter(p => p.department && userDepts.includes(p.department))
-        setProjects(filteredProjects)
-      } else {
-        setProjects(list)
-      }
+      setProjects(list)
+      setAllProjects(list)
     })
     return ()=>unsub()
-  },[userDepts])
+  },[])
 
   const join = async(p:Project)=>{
     if(!userId) return alert('Sign in required')
@@ -162,29 +157,7 @@ export default function Projects(){
               </p>
             </div>
 
-            {/* No Departments Selected */}
-            {(!userDepts || userDepts.length === 0) && (
-              <div className="max-w-2xl mx-auto text-center">
-                <div className="bg-black/40 backdrop-blur-xl border border-cyberblue-900/50 rounded-2xl p-8">
-                  <div className="text-cyberblue-300/70 mb-6">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto text-yellow-400/50 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                    Department Selection Required
-                  </div>
-                  <p className="text-cyberblue-300/70 mb-6">
-                    Please select your departments first to view available projects.
-                  </p>
-                  <Link 
-                    href="/departments" 
-                    className="group relative px-8 py-4 bg-gradient-to-r from-cyberblue-600 to-cyberblue-500 text-black font-semibold rounded-xl hover:shadow-2xl hover:shadow-cyberblue-500/25 transition-all duration-300 transform hover:scale-105"
-                  >
-                    <span className="relative z-10">Select Departments</span>
-                    <div className="absolute inset-0 bg-gradient-to-r from-cyberblue-500 to-cyberblue-400 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                  </Link>
-                </div>
-              </div>
-            )}
+            {/* The projects list now displays all projects irrespective of user departments */}
 
             {/* No Projects Available */}
             {projects.length === 0 && userDepts && userDepts.length > 0 && (
