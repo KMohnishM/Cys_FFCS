@@ -14,10 +14,10 @@ export default function AuthGuard({ children }: AuthGuardProps) {
   // Show loading state
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="p-4 bg-black/60 rounded-md shadow-lg">
-          <div className="animate-spin w-8 h-8 border-4 border-cyscom border-t-transparent rounded-full mx-auto"></div>
-          <p className="mt-2 text-slate-300">Loading...</p>
+      <div className="min-h-screen bg-black text-white flex items-center justify-center">
+        <div className="text-center space-y-3">
+          <div className="text-xs uppercase tracking-[0.18em] opacity-70">Loading...</div>
+          <div className="text-sm" aria-hidden="true">[ \\ ] [ | ] [ / ] [ - ]</div>
         </div>
       </div>
     )
@@ -30,15 +30,17 @@ export default function AuthGuard({ children }: AuthGuardProps) {
   
   // User is not authenticated, show sign-in message with redirect button
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-b from-black to-slate-900">
-      <div className="p-6 bg-black/60 backdrop-blur-md rounded-md shadow-lg max-w-md text-center">
-        <h2 className="text-xl text-cyscom font-semibold">Authentication Required</h2>
-        <p className="mt-2 text-slate-300">Please sign in to access this page.</p>
-        <div className="mt-6">
-          <Link href="/" className="px-4 py-2 bg-cyscom rounded text-black font-medium">
-            Go to Sign In
-          </Link>
-        </div>
+    <div className="min-h-screen bg-black text-white flex items-center justify-center">
+      <div className="ascii-card max-w-sm w-full text-center space-y-4">
+        <span className="ascii-card-top" aria-hidden="true">+----------------------+</span>
+        <h2 className="uppercase tracking-[0.18em] text-sm">Authentication Required</h2>
+        <p className="text-xs uppercase tracking-[0.12em] opacity-80">
+          Please sign in to access this page.
+        </p>
+        <Link href="/" className="ascii-button text-xs">
+          Go To Sign In
+        </Link>
+        <span className="ascii-card-bottom" aria-hidden="true">+----------------------+</span>
       </div>
     </div>
   )

@@ -14,6 +14,7 @@ export enum UserProgress {
 // Define which pages are accessible at each progress level
 const pageAccessRules: Record<string, UserProgress[]> = {
   '/': [UserProgress.NOT_AUTHENTICATED, UserProgress.NEEDS_DEPARTMENTS, UserProgress.NEEDS_PROJECT, UserProgress.COMPLETE],
+  '/home': [UserProgress.NOT_AUTHENTICATED, UserProgress.NEEDS_DEPARTMENTS, UserProgress.NEEDS_PROJECT, UserProgress.COMPLETE],
   '/login': [UserProgress.NOT_AUTHENTICATED, UserProgress.NEEDS_DEPARTMENTS, UserProgress.NEEDS_PROJECT, UserProgress.COMPLETE],
   '/dashboard': [UserProgress.NEEDS_DEPARTMENTS, UserProgress.NEEDS_PROJECT, UserProgress.COMPLETE],
   '/departments': [UserProgress.NEEDS_DEPARTMENTS, UserProgress.NEEDS_PROJECT, UserProgress.COMPLETE],
@@ -34,7 +35,7 @@ export default function useAuthGuard() {
   
   useEffect(() => {
     // Skip auth check for public pages
-    const publicPaths = ['/', '/login']
+  const publicPaths = ['/', '/home', '/login']
     if (publicPaths.includes(router.pathname)) {
       setUserProgress(UserProgress.NOT_AUTHENTICATED)
       setIsLoading(false)
@@ -77,7 +78,7 @@ export default function useAuthGuard() {
         setUserRole(userData.role)
         
         // Check departments
-        if (!userData.departments || userData.departments.length < 1) {
+        if (!userData.departments || userData.departments.length < 2) {
           setUserProgress(UserProgress.NEEDS_DEPARTMENTS)
           
           // Redirect to departments page if trying to access a page that requires departments
@@ -122,7 +123,7 @@ export default function useAuthGuard() {
     if (isLoading || userProgress === null) return
     
     // Skip for public pages
-    if (router.pathname === '/' || router.pathname === '/login') {
+  if (router.pathname === '/' || router.pathname === '/home' || router.pathname === '/login') {
       return
     }
     

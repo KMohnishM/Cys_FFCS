@@ -31,13 +31,13 @@ function PageTransition({ children }: { children: React.ReactNode }) {
   return (
     <div className="relative">
       {/* Smooth transition overlay */}
-      <div 
-        className={`fixed inset-0 bg-black z-50 transition-opacity duration-300 ${
+      <div
+        className={`fixed inset-0 bg-black z-50 transition-opacity duration-200 ${
           isLoading ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
       >
         <div className="flex items-center justify-center h-full">
-          <div className="animate-spin w-8 h-8 border-4 border-white/20 border-t-white rounded-full"></div>
+          <div className="animate-spin w-8 h-8 border-[1px] border-white border-t-transparent rounded-full"></div>
         </div>
       </div>
       
@@ -93,7 +93,7 @@ export default function App({ Component, pageProps }: AppProps) {
   }, [])
 
   // These paths should not require authentication
-  const publicPaths = ['/', '/login', '/_error', '/_document', '/_app']
+  const publicPaths = ['/', '/home', '/login', '/_error', '/_document', '/_app']
   
   // Check if current path is public
   const isPublicPath = publicPaths.includes(router.pathname)
