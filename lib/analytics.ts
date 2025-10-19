@@ -10,8 +10,9 @@ export type AnalyticsEventType =
   | 'project_join'
   | 'project_leave'
   | 'contribution_submit'
-  | 'contribution_approve'
-  | 'user_register';
+  | 'contribution_approve'  
+  | 'user_register'
+  'contribution_reject';
 
 // Analytics Context
 export interface AnalyticsContext {

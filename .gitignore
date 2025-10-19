@@ -17,3 +17,8 @@ yarn-error.log*
 firebase-debug.log
 *.tsbuildinfo
 next-env.d.ts
+/public/uploads/*
+!/public/uploads/.gitkeep
+!/public/uploads/projects/
+/public/uploads/projects/*
+!/public/uploads/projects/.gitkeep
