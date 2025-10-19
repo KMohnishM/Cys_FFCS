@@ -10,6 +10,7 @@ export default function Projects() {
   const [userId, setUserId] = useState<string | null>(null)
   const [userDepts, setUserDepts] = useState<string[] | null>(null)
   const [userRole, setUserRole] = useState<string | null>(null)
+  const [userProject, setUserProject] = useState<string | null>(null)
   const [pendingRequests, setPendingRequests] = useState<Set<string>>(new Set())
 
   useEffect(() => {
@@ -31,7 +32,12 @@ export default function Projects() {
   }, [])
 
   useEffect(() => {
-    if (!userId) return
+    if (!userId) {
+      setUserDepts(null);
+      setUserProject(null);
+      return;
+    }
+    
     const db = getDbClient()
     ;(async () => {
       const { doc, getDoc } = await import('firebase/firestore')
@@ -39,7 +45,8 @@ export default function Projects() {
       const snap = await getDoc(uref)
       if (snap.exists()) {
         const data = snap.data() as any
-        setUserDepts(Array.isArray(data.departments) ? data.departments : null)
+        setUserDepts(Array.isArray(data.departments) ? data.departments : null);
+        setUserProject(data.projectId || null);
       }
     })()
   }, [userId])
@@ -236,11 +243,18 @@ export default function Projects() {
                             const isPending = pendingRequests.has(p.projectId)
 
                             return (
-                              <article key={p.projectId} className="ascii-card h-full flex flex-col gap-4">
+                              <article key={p.projectId} className={`ascii-card h-full flex flex-col gap-4 ${
+                                isMember ? 'border-2 relative' : ''
+                              }`}>
+                                {isMember && (
+                                  <div className="absolute top-0 right-0 transform translate-x-1/2 -translate-y-1/2 bg-white text-black px-2 py-1 text-[10px] uppercase tracking-wider font-bold">
+                                    Your Project
+                                  </div>
+                                )}
                                 <div className="space-y-2">
                                   <div className="flex flex-wrap items-start justify-between gap-2">
                                     <Link href={`/project/${p.projectId}`} className="ascii-link text-lg sm:text-xl">
-                                      {p.name}
+                                      {p.name} {isMember && '★'}
                                     </Link>
                                     <span className="ascii-tag text-[11px] uppercase tracking-[0.18em]">
                                       {getDepartmentName(p.department)}

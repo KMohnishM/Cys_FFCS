@@ -1,6 +1,7 @@
 import { useRouter } from 'next/router'
 import { useEffect, useState } from 'react'
 import { getDbClient, getAuthClient } from '../../lib/firebase'
+import Navigation from '../../components/Navigation'
 import { doc, getDoc, collection, query, onSnapshot, addDoc, Timestamp, where, getDocs, deleteDoc } from 'firebase/firestore'
 import Link from 'next/link'
 
@@ -194,22 +195,39 @@ export default function ProjectPage(){
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black text-white flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-cyscom"></div>
+      <div className="min-h-screen bg-black text-white">
+        <Navigation userRole={null} />
+        <main className="page-shell py-8 sm:py-10">
+          <div className="ascii-card text-center space-y-3">
+            <span className="ascii-card-top" aria-hidden="true">+----------------------+</span>
+            <p className="text-xs uppercase tracking-[0.12em]">Loading project data...</p>
+            <p className="text-sm" aria-hidden="true">[ \\ ] [ | ] [ / ] [ - ]</p>
+            <span className="ascii-card-bottom" aria-hidden="true">+----------------------+</span>
+          </div>
+        </main>
       </div>
     );
   }
 
   if (!project) {
     return (
-      <div className="min-h-screen bg-black text-white py-16 px-4">
-        <div className="max-w-3xl mx-auto bg-pagebg/60 rounded-xl p-6 sm:p-8 backdrop-blur-md shadow-lg text-center">
-          <h2 className="text-xl sm:text-2xl font-semibold text-white">Project not found</h2>
-          <p className="text-slate-300 mt-2 text-sm sm:text-base">The requested project could not be found.</p>
-          <Link href="/projects" className="mt-6 inline-block px-4 py-2 bg-cyscom text-black rounded hover:bg-cyscom/90 transition-colors text-sm">
-            Back to Projects
-          </Link>
-        </div>
+      <div className="min-h-screen bg-black text-white">
+        <Navigation userRole={null} />
+        <main className="page-shell py-8 sm:py-10">
+          <div className="ascii-stack gap-6">
+            <header className="space-y-2">
+              <h1 className="ascii-title text-2xl sm:text-3xl">Project Not Found</h1>
+              <hr className="ascii-rule" />
+              <p className="ascii-footnote">The requested project could not be found.</p>
+            </header>
+            
+            <div className="flex justify-center">
+              <Link href="/projects" className="ascii-button text-xs py-2">
+                Back to Projects
+              </Link>
+            </div>
+          </div>
+        </main>
       </div>
     );
   }
@@ -217,194 +235,188 @@ export default function ProjectPage(){
   const isMember = (project.members || []).includes(userId);
 
   return (
-    <div className="min-h-screen bg-black text-white py-6 sm:py-12 px-4 sm:px-6">
-      <div className="max-w-4xl mx-auto bg-pagebg/60 rounded-xl p-5 sm:p-8 backdrop-blur-md shadow-lg space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <Link href="/projects" className="text-cyscom hover:text-cyscom/90 transition-colors flex items-center text-sm">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            Back to Projects
-          </Link>
-          {project.department && (
-            <span className="inline-block px-3 py-1 bg-cyscom/20 text-cyscom text-xs rounded">
-              {getDepartmentName(project.department)}
-            </span>
-          )}
-        </div>
-
-        <div className="space-y-3">
-          <h2 className="text-2xl sm:text-3xl font-semibold text-white leading-tight">{project.name}</h2>
-          <p className="text-slate-300 text-sm sm:text-base leading-relaxed">{project.description}</p>
-        </div>
-
-        <div className="p-4 sm:p-5 rounded bg-black/30 space-y-4">
-          <h4 className="text-lg text-white flex items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-            </svg>
-            Members
-            <span className="ml-2 text-sm text-slate-400">({members.length}/4)</span>
-          </h4>
-          {members.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {members.map(m => (
-                <div key={m.uid} className="p-2 bg-black/20 rounded flex items-center">
-                  <div className="w-8 h-8 rounded-full bg-cyscom/30 text-cyscom flex items-center justify-center mr-2">
-                    {m.name?.charAt(0) || 'U'}
-                  </div>
-                  <div>
-                    <div className="text-white">{m.name || 'Unknown'}</div>
-                    <div className="text-xs text-slate-400">{m.email}</div>
-                  </div>
-                </div>
-              ))}
+    <div className="min-h-screen bg-black text-white">
+      <Navigation userRole={null} />
+      <main className="page-shell py-8 sm:py-10">
+        <div className="ascii-stack gap-6">
+          {/* Header */}
+          <header className="space-y-2">
+            <div className="flex justify-between items-center">
+              <h1 className="ascii-title text-2xl sm:text-3xl">{project.name}</h1>
+              {project.department && (
+                <span className="ascii-tag">
+                  {getDepartmentName(project.department)}
+                </span>
+              )}
             </div>
-          ) : (
-            <div className="text-slate-400 mt-2">No members yet</div>
-          )}
-        </div>
-
-        {/* Project Contributions Section */}
-        <div className="space-y-4">
-          <h4 className="text-lg text-white flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-              </svg>
-              Contributions
-            </div>
-            {isMember && (
-              <Link href={`/contributions?projectId=${project.projectId}`} className="text-cyscom text-sm hover:underline flex items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-                Submit Contribution
+            <hr className="ascii-rule" />
+            <div className="text-xs sm:text-sm uppercase tracking-[0.14em] sm:tracking-[0.16em]">
+              <Link href="/projects" className="flex items-center gap-2 hover:underline">
+                <span>⟵</span>
+                <span>Projects</span>
               </Link>
-            )}
-          </h4>
+            </div>
+            <p className="text-sm leading-relaxed">{project.description}</p>
+          </header>
 
-          {isMember ? (
-            <div className="p-4 bg-black/20 rounded space-y-4">
-              <p className="text-slate-300 text-sm sm:text-base">Submit your contributions for this project to earn points!</p>
-              <div className="flex flex-col sm:flex-row justify-between gap-4 sm:items-center">
-                <div className="flex-1">
-                  <ul className="text-xs sm:text-sm text-slate-400 list-disc pl-5 space-y-1">
+          {/* Members Section */}
+          <section className="ascii-card space-y-4">
+            <span className="ascii-card-top" aria-hidden="true">+-----------------------+</span>
+            <div className="flex justify-between items-center">
+              <p className="ascii-meta">Project Members</p>
+              <div className="text-xs tracking-wide">
+                {members.length}/4 members
+              </div>
+            </div>
+
+            {members.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {members.map(m => (
+                  <div key={m.uid} className="border border-white/50 p-3 flex items-center">
+                    <div className="w-8 h-8 border border-white flex items-center justify-center mr-3">
+                      {m.name?.charAt(0) || 'U'}
+                    </div>
+                    <div>
+                      <div className="uppercase tracking-wider text-sm">{m.name || 'Unknown'}</div>
+                      <div className="text-xs opacity-70">{m.email}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-4 text-sm opacity-70 uppercase tracking-wide">
+                No members yet
+              </div>
+            )}
+            <span className="ascii-card-bottom" aria-hidden="true">+-----------------------+</span>
+          </section>
+
+          {/* Project Contributions Section */}
+          <section className="ascii-card space-y-4">
+            <span className="ascii-card-top" aria-hidden="true">+-----------------------+</span>
+            <div className="flex justify-between items-center">
+              <p className="ascii-meta">Contributions</p>
+              {isMember && (
+                <Link href={`/contributions?projectId=${project.projectId}`} className="text-xs uppercase tracking-wide hover:underline">
+                  + Submit New
+                </Link>
+              )}
+            </div>
+
+            {isMember ? (
+              <div className="space-y-4">
+                <p className="text-sm">Submit your contributions for this project to earn points!</p>
+                <div className="border border-white/40 p-3">
+                  <ul className="ascii-list text-xs space-y-2">
                     <li>Include details of your work</li>
                     <li>Add screenshots or images if applicable</li>
                     <li>Admins will review and award points</li>
                   </ul>
                 </div>
-                <Link href={`/contributions?projectId=${project.projectId}`} className="self-start sm:self-auto px-4 py-2 bg-cyscom text-black rounded hover:bg-cyscom/90 transition-colors text-sm">
-                  Add Contribution
-                </Link>
+                <div className="flex justify-end">
+                  <Link href={`/contributions?projectId=${project.projectId}`} className="ascii-button text-xs py-2">
+                    Add Contribution
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <p className="text-center py-2 text-sm">Join this project to submit contributions</p>
+                
+                {!isMember && userId && (
+                  <div className="flex justify-center">
+                    {hasPendingRequest ? (
+                      <div className="space-y-3 text-center">
+                        <div className="text-sm uppercase tracking-wide opacity-70">Request Pending</div>
+                        <button 
+                          onClick={withdrawRequest} 
+                          className="ascii-button text-xs py-2"
+                        >
+                          Withdraw
+                        </button>
+                      </div>
+                    ) : (
+                      <button 
+                        onClick={requestToJoin} 
+                        disabled={requesting}
+                        className="ascii-button text-xs py-2"
+                      >
+                        Request to Join
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+            <span className="ascii-card-bottom" aria-hidden="true">+-----------------------+</span>
+          </section>
+
+          {/* Project Reviews Section */}
+          <section className="ascii-card space-y-4">
+            <span className="ascii-card-top" aria-hidden="true">+-----------------------+</span>
+            <div className="flex justify-between items-center">
+              <p className="ascii-meta">Reviews</p>
+              <div className="text-xs tracking-wide">
+                {reviews.length} review{reviews.length !== 1 ? 's' : ''}
               </div>
             </div>
-          ) : (
-            <div className="p-4 bg-black/20 rounded text-center space-y-4">
-              <p className="text-slate-300 text-sm sm:text-base">Join this project to submit contributions</p>
-              {!isMember && userId && (
-                <div>
-                  {hasPendingRequest ? (
-                    <div className="space-y-3">
-                      <div className="text-yellow-400 text-sm">Your join request is pending approval</div>
-                      <button 
-                        onClick={withdrawRequest} 
-                        className="px-6 py-2 bg-yellow-600/50 text-yellow-400 border border-yellow-700/50 rounded hover:bg-yellow-600/70 transition-colors text-sm"
-                      >
-                        Withdraw Request
-                      </button>
+
+            {isMember ? (
+              <div className="space-y-3">
+                <textarea 
+                  value={comment} 
+                  onChange={(e)=>setComment(e.target.value)} 
+                  placeholder="ADD YOUR REVIEW..."
+                  className="ascii-input"
+                  rows={3}
+                />
+                <div className="flex justify-end">
+                  <button 
+                    onClick={submitReview} 
+                    disabled={submitting || !comment.trim()}
+                    className="ascii-button text-xs py-2"
+                  >
+                    {submitting ? 'Submitting...' : 'Submit'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-4 space-y-3">
+                <p className="text-sm uppercase tracking-wider opacity-70">Join this project to add reviews</p>
+                <Link href="/projects" className="ascii-button text-xs py-2">
+                  Go to Projects
+                </Link>
+              </div>
+            )}
+
+            <div className="space-y-3">
+              {reviews.length > 0 ? (
+                reviews.map(r => (
+                  <div key={r.id} className="border border-white p-4 space-y-3">
+                    <p className="text-sm">{r.comment}</p>
+                    <div className="flex flex-wrap justify-between items-center gap-2 text-xs uppercase tracking-wider opacity-70">
+                      <div>By {r.userName || r.userId.substring(0, 8)}</div>
+                      <div>{new Date(r.createdAt).toLocaleDateString()}</div>
                     </div>
-                  ) : (
-                    <button 
-                      onClick={requestToJoin} 
-                      disabled={requesting}
-                      className={`px-6 py-2 rounded flex items-center justify-center mx-auto text-sm ${
-                        requesting 
-                          ? 'bg-gray-600 text-gray-300 cursor-not-allowed' 
-                          : 'bg-cyscom text-black hover:bg-cyscom/90 transition-colors'
-                      }`}
-                    >
-                      {requesting && (
-                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                      )}
-                      Request to Join Project
-                    </button>
-                  )}
+                  </div>
+                ))
+              ) : (
+                <div className="py-4 text-center text-xs uppercase tracking-wider opacity-50">
+                  No reviews yet
                 </div>
               )}
             </div>
-          )}
+            <span className="ascii-card-bottom" aria-hidden="true">+-----------------------+</span>
+          </section>
+
+          {/* Footer */}
+          <footer className="flex justify-center">
+            <Link href="/projects" className="ascii-button text-xs py-2">
+              Back to Projects
+            </Link>
+          </footer>
         </div>
-
-        {/* Project Reviews Section */}
-        <div className="space-y-4">
-          <h4 className="text-lg text-white flex items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
-            </svg>
-            Reviews
-            <span className="ml-2 text-sm text-slate-400">({reviews.length})</span>
-          </h4>
-
-          {isMember ? (
-            <div className="p-3 bg-black/20 rounded space-y-3">
-              <textarea 
-                value={comment} 
-                onChange={(e)=>setComment(e.target.value)} 
-                placeholder="Add your review..."
-                className="w-full p-3 bg-black/20 text-white rounded resize-none focus:outline-none focus:ring-1 focus:ring-cyscom text-sm" 
-                rows={3}
-              />
-              <div className="flex justify-end">
-                <button 
-                  onClick={submitReview} 
-                  disabled={submitting || !comment.trim()}
-                  className={`px-4 py-1.5 rounded flex items-center text-sm ${
-                    submitting || !comment.trim() 
-                      ? 'bg-gray-600 text-gray-300 cursor-not-allowed' 
-                      : 'bg-cyscom text-black hover:bg-cyscom/90 transition-colors'
-                  }`}
-                >
-                  {submitting && (
-                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                  )}
-                  Submit review
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="p-4 bg-black/20 rounded text-center space-y-3">
-              <p className="text-slate-300 text-sm sm:text-base">Join this project to add reviews</p>
-              <Link href="/projects" className="inline-block px-3 py-1 bg-cyscom text-black rounded hover:bg-cyscom/90 transition-colors text-sm">
-                Go to Projects
-              </Link>
-            </div>
-          )}
-
-          <div className="space-y-3">
-            {reviews.length > 0 ? (
-              reviews.map(r => (
-                <div key={r.id} className="p-3 bg-black/20 rounded space-y-2">
-                  <p className="text-white text-sm sm:text-base leading-relaxed">{r.comment}</p>
-                  <div className="flex flex-wrap justify-between items-center gap-2 text-xs text-slate-400">
-                    <div className="font-medium">By {r.userName || r.userId}</div>
-                    <div>{new Date(r.createdAt).toLocaleString()}</div>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="p-4 bg-black/20 rounded text-center text-slate-400 text-sm">No reviews yet</div>
-            )}
-          </div>
-        </div>
-      </div>
+      </main>
     </div>
   )
 }
