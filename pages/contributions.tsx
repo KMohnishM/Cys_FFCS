@@ -38,6 +38,8 @@ export default function Contributions() {
   const [allProjects, setAllProjects] = useState<any[]>([])
   const [userRole, setUserRole] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'verified' | 'rejected'>('all')
+  const [viewerImage, setViewerImage] = useState<string | null>(null)
+  const [viewerZoom, setViewerZoom] = useState<number>(1)
 
   const projectScopedContribs = useMemo(() => {
     if (!selectedProject) return contribs
@@ -246,21 +248,30 @@ export default function Contributions() {
           return
         }
 
-        // Resize & compress to reduce storage/bandwidth (max width 1024)
-        const toDataUrl = (file: File, maxWidth = 1024, quality = 0.8): Promise<{ dataUrl: string; name: string }> => {
+        // Resize & compress to reduce storage/bandwidth with improved quality settings
+        const toDataUrl = (file: File, maxWidth = 2048, quality = 0.92): Promise<{ dataUrl: string; name: string }> => {
           return new Promise((resolve, reject) => {
             const img = new Image()
             const reader = new FileReader()
             reader.onload = () => {
               img.onload = () => {
                 const canvas = document.createElement('canvas')
-                const scale = Math.min(1, maxWidth / img.width)
+                // Only scale down if image is larger than maxWidth
+                const scale = img.width > maxWidth ? maxWidth / img.width : 1
                 canvas.width = Math.round(img.width * scale)
                 canvas.height = Math.round(img.height * scale)
                 const ctx = canvas.getContext('2d')!
+                
+                // Use better quality rendering
+                ctx.imageSmoothingEnabled = true
+                ctx.imageSmoothingQuality = 'high'
+                
                 ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
-                // choose webp if available
-                const dataUrl = canvas.toDataURL('image/jpeg', quality)
+                
+                // Use WebP if supported, otherwise fall back to high quality JPEG
+                const isWebPSupported = canvas.toDataURL('image/webp').indexOf('data:image/webp') === 0
+                const format = isWebPSupported ? 'image/webp' : 'image/jpeg'
+                const dataUrl = canvas.toDataURL(format, quality)
                 resolve({ dataUrl, name: file.name.replace(/\s+/g, '_') })
               }
               if (typeof reader.result === 'string') img.src = reader.result
@@ -270,7 +281,7 @@ export default function Contributions() {
           })
         }
 
-        const { dataUrl, name } = await toDataUrl(file, 1024, 0.78)
+        const { dataUrl, name } = await toDataUrl(file, 2048, 0.92)
 
         // POST to local API route that saves to public/uploads
         const res = await fetch('/api/upload', {
@@ -468,19 +479,16 @@ export default function Contributions() {
           {/* Contributions List */}
           <section className="ascii-card space-y-4">
             <span className="ascii-card-top" aria-hidden="true">+-----------------------+</span>
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <div className="flex justify-between items-center">
               <p className="ascii-meta">Contribution History</p>
-              <div className="flex items-center gap-2">
-                <button className={`px-3 py-1 rounded ${statusFilter === 'all' ? 'bg-sky-600 text-white' : 'bg-slate-100 text-black'}`} onClick={() => setStatusFilter('all')}>All ({statusCounts.all})</button>
-                <button className={`px-3 py-1 rounded ${statusFilter === 'pending' ? 'bg-sky-600 text-white' : 'bg-slate-100 text-black'}`} onClick={() => setStatusFilter('pending')}>Pending ({statusCounts.pending})</button>
-                <button className={`px-3 py-1 rounded ${statusFilter === 'verified' ? 'bg-sky-600 text-white' : 'bg-slate-100 text-black'}`} onClick={() => setStatusFilter('verified')}>Verified ({statusCounts.verified})</button>
-                <button className={`px-3 py-1 rounded ${statusFilter === 'rejected' ? 'bg-sky-600 text-white' : 'bg-slate-100 text-black'}`} onClick={() => setStatusFilter('rejected')}>Rejected ({statusCounts.rejected})</button>
+              <div className="text-xs tracking-wide">
+                {contribs.length} item{contribs.length !== 1 ? 's' : ''}
               </div>
             </div>
 
             {user ? (
               <div className="space-y-4">
-                {visibleContribs.length === 0 && (
+                {contribs.length === 0 && (
                   <div className="py-8 text-center">
                     <div className="text-sm uppercase tracking-wider opacity-50">
                       No contributions found
@@ -491,7 +499,7 @@ export default function Contributions() {
                   </div>
                 )}
 
-                {visibleContribs.map((c) => (
+                {contribs.map((c) => (
                   <div key={c.contribId} className="border border-white p-4 space-y-3">
                     <div className="flex justify-between items-start">
                       <div className="flex gap-2 items-center text-xs uppercase tracking-wider opacity-70">
@@ -509,12 +517,31 @@ export default function Contributions() {
                     <p className="text-sm">{c.text}</p>
                     
                     {c.imageUrl && (
-                      <div className="border border-white/50 inline-block">
-                        <img 
-                          src={c.imageUrl} 
-                          alt="contribution" 
-                          className="max-h-32 w-auto object-contain" 
-                        />
+                      <div 
+                        className="relative group border-2 border-white/70 hover:border-white inline-block cursor-pointer shadow-lg hover:shadow-xl transition-all duration-200" 
+                        onClick={() => setViewerImage(c.imageUrl || null)}
+                      >
+                        {/* Smaller sized preview */}
+                        <div className="max-h-48 min-h-[100px] min-w-[100px] bg-black/20 flex items-center justify-center">
+                          <img 
+                            src={c.imageUrl} 
+                            alt="contribution" 
+                            className="max-h-48 w-auto object-contain" 
+                            loading="lazy"
+                            style={{
+                              imageRendering: 'auto',
+                              backfaceVisibility: 'hidden'
+                            }}
+                          />
+                        </div>
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/60 transition-all duration-200">
+                          <div className="opacity-0 group-hover:opacity-100 transform group-hover:scale-100 scale-90 transition-all duration-200 bg-white/10 backdrop-blur-sm p-3 rounded flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+                            </svg>
+                            <span className="font-bold tracking-wider">View Full Image</span>
+                          </div>
+                        </div>
                       </div>
                     )}
                     
@@ -548,6 +575,122 @@ export default function Contributions() {
           </footer>
         </div>
       </main>
+
+      {/* Image Viewer Modal */}
+      {viewerImage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 p-2">
+          <div className="relative w-full max-w-6xl h-[90vh] flex flex-col">
+            {/* Header with controls */}
+            <div className="absolute top-0 left-0 right-0 z-10 flex justify-between items-center p-4 bg-gradient-to-b from-black to-transparent">
+              <div className="flex items-center gap-4">
+                <div className="flex bg-black/80 border border-white p-1 rounded">
+                  <button 
+                    onClick={() => setViewerZoom(z => Math.max(0.5, z - 0.25))}
+                    className="px-4 py-2 text-lg font-bold hover:bg-white/10"
+                    aria-label="Zoom out"
+                  >
+                    −
+                  </button>
+                  <div className="px-3 py-2 border-x border-white/30">
+                    {Math.round(viewerZoom * 100)}%
+                  </div>
+                  <button 
+                    onClick={() => setViewerZoom(z => Math.min(5, z + 0.25))}
+                    className="px-4 py-2 text-lg font-bold hover:bg-white/10"
+                    aria-label="Zoom in"
+                  >
+                    +
+                  </button>
+                </div>
+                
+                <button 
+                  onClick={() => setViewerZoom(1)}
+                  className="bg-black/80 border border-white px-4 py-2 hover:bg-white/10"
+                >
+                  Reset View
+                </button>
+                
+                <a 
+                  href={viewerImage} 
+                  download 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="bg-black/80 border border-white px-4 py-2 hover:bg-white/10 flex items-center gap-2"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  Download
+                </a>
+              </div>
+              
+              <button 
+                onClick={() => {
+                  setViewerImage(null);
+                  setViewerZoom(1);
+                }}
+                className="bg-red-900 border border-red-700 text-white px-4 py-2 hover:bg-red-800"
+                aria-label="Close image viewer"
+              >
+                Close Viewer
+              </button>
+            </div>
+            
+            {/* Main image container with scroll/zoom */}
+            <div 
+              className="overflow-auto flex-1 flex items-center justify-center mt-16"
+              style={{
+                backgroundColor: 'rgba(0,0,0,0.9)'
+              }}
+            >
+              <div 
+                style={{
+                  transform: `scale(${viewerZoom})`,
+                  transformOrigin: 'center center',
+                  transition: 'transform 0.2s ease-out'
+                }}
+                className="relative cursor-move"
+              >
+                <img 
+                  src={viewerImage} 
+                  alt="Contribution Image" 
+                  className="max-w-none max-h-none shadow-2xl"
+                  style={{
+                    boxShadow: '0 0 20px rgba(255,255,255,0.1)',
+                    imageRendering: 'auto',
+                    objectFit: 'contain',
+                    backfaceVisibility: 'hidden'
+                  }}
+                  onLoad={(e) => {
+                    // Auto-fit large images
+                    const img = e.target as HTMLImageElement;
+                    const container = document.querySelector('.overflow-auto');
+                    
+                    if (container) {
+                      const containerWidth = container.clientWidth;
+                      const containerHeight = container.clientHeight;
+                      
+                      if (img.naturalWidth > containerWidth || img.naturalHeight > containerHeight) {
+                        // Automatically adjust zoom to fit image within viewport
+                        const widthRatio = containerWidth / img.naturalWidth;
+                        const heightRatio = containerHeight / img.naturalHeight;
+                        const fitZoom = Math.min(1, Math.min(widthRatio, heightRatio) * 0.9);
+                        
+                        if (fitZoom < 1) setViewerZoom(fitZoom);
+                      }
+                    }
+                  }}
+                />
+              </div>
+            </div>
+            
+            {/* Image navigation dots (for future multi-image support) */}
+            <div className="bg-black py-3 flex justify-center">
+              <div className="bg-white/10 h-1 w-20 rounded-full"></div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

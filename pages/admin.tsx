@@ -12,8 +12,6 @@ export default function Admin() {
   const [contribFilter, setContribFilter] = useState<'pending'|'all'|'verified'|'rejected'>('pending')
   const [loadingIds, setLoadingIds] = useState<string[]>([])
   const [users, setUsers] = useState<User[]>([])
-  const [editingDepartments, setEditingDepartments] = useState<Record<string, string[]>>({})
-  const [userSearch, setUserSearch] = useState<string>('')
   const [departments, setDepartments] = useState<Department[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [activeTab, setActiveTab] = useState<'analytics' | 'contributions' | 'users' | 'projects' | 'join-requests'>('analytics')
@@ -68,44 +66,20 @@ export default function Admin() {
     } else {
       q = query(col, where('status', '==', contribFilter))
     }
-    const unsub = onSnapshot(q, async (snap) => {
+    const unsub = onSnapshot(q, (snap) => {
       const list: Contribution[] = []
-      // build array of promises to fetch user and project details
-      const rows = await Promise.all(snap.docs.map(async (d) => {
+      snap.forEach((d) => {
         const data = d.data() as any
-        let userName = ''
-        let projectName: string | null = null
-        try {
-          if (data.userId) {
-            const uSnap = await getDoc(doc(db, 'users', data.userId))
-            if (uSnap.exists()) userName = (uSnap.data() as any).name || ''
-          }
-        } catch (e) {
-          console.warn('Failed to fetch user for contribution', d.id, e)
-        }
-        try {
-          if (data.projectId) {
-            const pSnap = await getDoc(doc(db, 'projects', data.projectId))
-            if (pSnap.exists()) projectName = (pSnap.data() as any).name || data.projectId
-          }
-        } catch (e) {
-          console.warn('Failed to fetch project for contribution', d.id, e)
-        }
-
-        return {
+        list.push({
           contribId: d.id,
           userId: data.userId,
-          userName,
           projectId: data.projectId,
-          projectName,
           text: data.text,
           imageUrl: data.imageUrl,
           status: data.status,
           pointsAwarded: data.pointsAwarded,
-        } as Contribution & any
-      }))
-
-      list.push(...rows)
+        })
+      })
       setContributions(list)
     })
     return () => unsub()
@@ -132,14 +106,6 @@ export default function Admin() {
         })
       })
       setUsers(list)
-      // Initialize editing state for checkboxes
-      setEditingDepartments((prev) => {
-        const next = { ...prev }
-        for (const u of list) {
-          next[u.userId] = Array.isArray(u.departments) ? [...u.departments] : []
-        }
-        return next
-      })
     })
     return () => unsub()
   }, [userRole])
@@ -231,47 +197,49 @@ export default function Admin() {
     
     try {
       await runTransaction(db, async (tx) => {
+        // First, read all existing departments for the user
         const userRef = doc(db, 'users', userId)
         const userSnap = await tx.get(userRef)
-        if (!userSnap.exists()) throw new Error('User not found')
-
+        
+        if (!userSnap.exists()) {
+          throw new Error('User not found')
+        }
+        
         const userData = userSnap.data()
-        const oldDepts: string[] = Array.isArray(userData.departments) ? userData.departments : []
-
-        // Prepare all department refs we will touch (removed + added)
-        const touchedDeptIds = Array.from(new Set([...oldDepts, ...departments]))
-        const deptRefs = touchedDeptIds.map((id) => ({ id, ref: doc(db, 'departments', id) }))
-
-        // Read all departments first
-        const deptSnaps = await Promise.all(deptRefs.map((d) => tx.get(d.ref)))
-        const deptDataMap: Record<string, any> = {}
-        deptSnaps.forEach((snap, idx) => {
-          if (snap.exists()) {
-            deptDataMap[deptRefs[idx].id] = snap.data()
-          }
-        })
-
-        // Now perform writes: update department filled counts
-        for (const oldId of oldDepts) {
-          if (!departments.includes(oldId)) {
-            const data = deptDataMap[oldId]
-            const currentCount = (data && data.filledCount) ? data.filledCount : 0
-            tx.update(doc(db, 'departments', oldId), { filledCount: Math.max(0, currentCount - 1) })
+        const oldDepts = userData.departments || []
+        
+        // For departments that are being removed, decrement the filledCount
+        for (const oldDeptId of oldDepts) {
+          if (!departments.includes(oldDeptId)) {
+            const deptRef = doc(db, 'departments', oldDeptId)
+            const deptSnap = await tx.get(deptRef)
+            
+            if (deptSnap.exists()) {
+              const deptData = deptSnap.data()
+              const currentCount = deptData.filledCount || 0
+              tx.update(deptRef, { filledCount: Math.max(0, currentCount - 1) })
+            }
           }
         }
-
-        for (const newId of departments) {
-          if (!oldDepts.includes(newId)) {
-            const data = deptDataMap[newId]
-            const currentCount = (data && data.filledCount) ? data.filledCount : 0
-            tx.update(doc(db, 'departments', newId), { filledCount: currentCount + 1 })
+        
+        // For departments that are being added, increment the filledCount
+        for (const newDeptId of departments) {
+          if (!oldDepts.includes(newDeptId)) {
+            const deptRef = doc(db, 'departments', newDeptId)
+            const deptSnap = await tx.get(deptRef)
+            
+            if (deptSnap.exists()) {
+              const deptData = deptSnap.data()
+              const currentCount = deptData.filledCount || 0
+              tx.update(deptRef, { filledCount: currentCount + 1 })
+            }
           }
         }
-
-        // Finally update user document
+        
+        // Update the user's departments
         tx.update(userRef, { departments })
       })
-
+      
       alert('User departments updated successfully')
     } catch (e) {
       console.error('Update departments failed', e)
@@ -287,29 +255,33 @@ export default function Admin() {
     
     try {
       await runTransaction(db, async (tx) => {
+        // First, read the user document
         const userRef = doc(db, 'users', userId)
         const userSnap = await tx.get(userRef)
-        if (!userSnap.exists()) throw new Error('User not found')
-
+        
+        if (!userSnap.exists()) {
+          throw new Error('User not found')
+        }
+        
         const userData = userSnap.data()
-        const oldDepts: string[] = Array.isArray(userData.departments) ? userData.departments : []
-
-        // Read all department docs first
-        const deptRefs = oldDepts.map((id) => doc(db, 'departments', id))
-        const deptSnaps = await Promise.all(deptRefs.map((ref) => tx.get(ref)))
-
-        // Perform writes after reads
-        deptSnaps.forEach((snap, idx) => {
-          if (snap.exists()) {
-            const data = snap.data() as any
-            const currentCount = data.filledCount || 0
-            tx.update(deptRefs[idx], { filledCount: Math.max(0, currentCount - 1) })
+        const oldDepts = userData.departments || []
+        
+        // For each department, decrement the filledCount
+        for (const oldDeptId of oldDepts) {
+          const deptRef = doc(db, 'departments', oldDeptId)
+          const deptSnap = await tx.get(deptRef)
+          
+          if (deptSnap.exists()) {
+            const deptData = deptSnap.data()
+            const currentCount = deptData.filledCount || 0
+            tx.update(deptRef, { filledCount: Math.max(0, currentCount - 1) })
           }
-        })
-
+        }
+        
+        // Reset the user's departments
         tx.update(userRef, { departments: [] })
       })
-
+      
       alert('User departments reset successfully')
     } catch (e) {
       console.error('Reset departments failed', e)
@@ -595,14 +567,10 @@ export default function Admin() {
               </div>
 
               {contributions.length === 0 && <p className="text-slate-300">No contributions.</p>}
-              {contributions.map((c: Contribution & any) => (
+              {contributions.map((c: Contribution) => (
                 <div key={c.contribId} className="p-3 rounded bg-black/30">
                   <div className="flex items-start gap-4">
                     <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h4 className="text-sm font-medium text-white">{c.userName || c.userId}</h4>
-                        {c.projectName && <span className="px-2 py-1 bg-slate-700 text-xs rounded">{c.projectName}</span>}
-                      </div>
                       <p className="text-slate-200">{c.text}</p>
                       {c.imageUrl && (
                         <div className="mt-2">
@@ -639,21 +607,8 @@ export default function Admin() {
             <p className="text-slate-300 mt-2">Assign users to departments or reset their selections.</p>
             
             <div className="mt-6 space-y-6">
-              <div className="mb-4">
-                <input
-                  type="text"
-                  placeholder="Search users by name"
-                  value={userSearch}
-                  onChange={(e) => setUserSearch(e.target.value)}
-                  className="bg-black/20 p-2 rounded w-full"
-                />
-              </div>
-
-              {users.filter(u => u.name.toLowerCase().includes(userSearch.trim().toLowerCase())).length === 0 && (
-                <p className="text-slate-300">No users found.</p>
-              )}
-
-              {users.filter(u => u.name.toLowerCase().includes(userSearch.trim().toLowerCase())).map((user) => (
+              {users.length === 0 && <p className="text-slate-300">No users found.</p>}
+              {users.map((user) => (
                 <div key={user.userId} className="p-4 rounded bg-black/30">
                   <div className="flex flex-col md:flex-row md:items-start gap-4">
                     <div className="flex-1">
@@ -692,26 +647,16 @@ export default function Admin() {
                               <input
                                 type="checkbox"
                                 id={`dept-${user.userId}-${dept.deptId}`}
-                                checked={(editingDepartments[user.userId] || []).includes(dept.deptId)}
+                                checked={user.departments?.includes(dept.deptId) || false}
                                 onChange={(e) => {
-                                  const checked = e.target.checked
-                                  setEditingDepartments((prev) => {
-                                    const copy = { ...prev }
-                                    const curr = Array.isArray(copy[user.userId]) ? [...copy[user.userId]] : []
-                                    if (checked) {
-                                      if (!curr.includes(dept.deptId)) curr.push(dept.deptId)
-                                    } else {
-                                      const idx = curr.indexOf(dept.deptId)
-                                      if (idx !== -1) curr.splice(idx, 1)
-                                    }
-                                    // Enforce max 2 selections in UI
-                                    if (curr.length > 2) {
-                                      alert('A user can only be in up to 2 departments')
-                                      return prev
-                                    }
-                                    copy[user.userId] = curr
-                                    return copy
-                                  })
+                                  const checked = e.target.checked;
+                                  const updatedDepts = checked
+                                    ? [...(user.departments || []), dept.deptId]
+                                    : (user.departments || []).filter(d => d !== dept.deptId);
+                                  
+                                  // Don't actually update yet, just handle the checkbox UI
+                                  // The user will need to click "Update" to apply changes
+                                  e.target.checked = checked;
                                 }}
                                 className="mr-2"
                               />
@@ -724,11 +669,9 @@ export default function Admin() {
                         <div className="mt-3 flex gap-2">
                           <button
                             onClick={() => {
-                              const selectedDepts = editingDepartments[user.userId] || []
-                              if (selectedDepts.length > 2) {
-                                alert('A user can only be in up to 2 departments')
-                                return
-                              }
+                              const selectedDepts = departments
+                                .filter(dept => (document.getElementById(`dept-${user.userId}-${dept.deptId}`) as HTMLInputElement)?.checked)
+                                .map(dept => dept.deptId);
                               updateUserDepartments(user.userId, selectedDepts);
                             }}
                             disabled={loadingIds.includes(user.userId)}
@@ -742,24 +685,6 @@ export default function Admin() {
                             className="flex-1 px-3 py-1 rounded bg-red-600 text-white text-sm"
                           >
                             Reset
-                          </button>
-                          <button
-                            onClick={async () => {
-                              setLoading(user.userId, true)
-                              try {
-                                const db = getDbClient()
-                                await updateDoc(doc(db, 'users', user.userId), { totalPoints: 0 })
-                                alert('User points reset')
-                              } catch (e) {
-                                console.error('Failed to reset points', e)
-                                alert('Failed to reset points')
-                              } finally {
-                                setLoading(user.userId, false)
-                              }
-                            }}
-                            className="flex-1 px-3 py-1 rounded bg-yellow-600 text-black text-sm"
-                          >
-                            Reset Points
                           </button>
                         </div>
                       </div>
