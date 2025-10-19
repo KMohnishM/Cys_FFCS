@@ -83,7 +83,7 @@ export default function Admin() {
       setContributions(list)
     })
     return () => unsub()
-  }, [])
+  }, [contribFilter])
   
   // Load users for department management
   useEffect(() => {

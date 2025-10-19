@@ -5,16 +5,17 @@ import { collection, query, onSnapshot, doc, runTransaction, where, getDocs, add
 import type { Project } from '../types'
 import Navigation from '../components/Navigation'
 
-export default function Projects() {
+export default function Projects(){
   const [projects, setProjects] = useState<Project[]>([])
-  const [userId, setUserId] = useState<string | null>(null)
-  const [userDepts, setUserDepts] = useState<string[] | null>(null)
+  const [userId, setUserId] = useState<string|null>(null)
+  const [userDepts, setUserDepts] = useState<string[]|null>(null)
+  const [allProjects, setAllProjects] = useState<Project[]>([])
   const [userRole, setUserRole] = useState<string | null>(null)
   const [userProject, setUserProject] = useState<string | null>(null)
   const [pendingRequests, setPendingRequests] = useState<Set<string>>(new Set())
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return
+  useEffect(()=>{
+    if(typeof window==='undefined') return
     const auth = getAuthClient()
     const db = getDbClient()
     const unsub = auth.onAuthStateChanged(async (u: any | null) => {
@@ -28,8 +29,8 @@ export default function Projects() {
         setUserRole(null)
       }
     })
-    return () => unsub()
-  }, [])
+    return ()=>unsub()
+  },[])
 
   useEffect(() => {
     if (!userId) {
@@ -39,39 +40,41 @@ export default function Projects() {
     }
     
     const db = getDbClient()
-    ;(async () => {
+    ;(async ()=>{
       const { doc, getDoc } = await import('firebase/firestore')
-      const uref = doc(db, 'users', userId)
+      const uref = doc(db,'users',userId)
       const snap = await getDoc(uref)
-      if (snap.exists()) {
+      if(snap.exists()){
         const data = snap.data() as any
         setUserDepts(Array.isArray(data.departments) ? data.departments : null);
         setUserProject(data.projectId || null);
       }
     })()
-  }, [userId])
+  },[userId])
 
-  useEffect(() => {
+  useEffect(()=>{
     const db = getDbClient()
-    const col = collection(db, 'projects')
+    const col = collection(db,'projects')
     const q = query(col)
-    const unsub = onSnapshot(q, (snap) => {
+    const unsub = onSnapshot(q,(snap)=>{
       const list: Project[] = []
-      snap.forEach((d) => {
+      snap.forEach(d=>{
         const data = d.data() as any
         list.push({
           projectId: d.id,
           name: data.name,
           description: data.description,
-          members: data.members || [],
-          department: data.department || null,
+          members: data.members || [], 
+          department: data.department || null
         } as Project & any)
       })
       setProjects(list)
+      setAllProjects(list)
     })
-    return () => unsub()
-  }, [])
+    return ()=>unsub()
+  },[])
 
+  // Track pending join requests
   useEffect(() => {
     if (!userId) return
     const db = getDbClient()
@@ -91,45 +94,46 @@ export default function Projects() {
     return () => unsub()
   }, [userId])
 
-  const requestToJoin = async (p: Project) => {
-    if (!userId) return alert('Sign in required')
+  const requestToJoin = async(p:Project)=>{
+    if(!userId) return alert('Sign in required')
     const db = getDbClient()
-    try {
-      const existingRequests = await getDocs(
-        query(
-          collection(db, 'joinRequests'),
-          where('userId', '==', userId),
-          where('projectId', '==', p.projectId),
-          where('status', '==', 'pending')
-        )
-      )
-
+    try{
+      // Check if user already has a pending request
+      const existingRequests = await getDocs(query(
+        collection(db, 'joinRequests'),
+        where('userId', '==', userId),
+        where('projectId', '==', p.projectId),
+        where('status', '==', 'pending')
+      ))
+      
       if (!existingRequests.empty) {
         alert('You already have a pending join request for this project')
         return
       }
-
+      
+      // Check if user is already a member
       if (p.members.includes(userId)) {
         alert('You are already a member of this project')
         return
       }
-
+      
+      // Check if project is full
       if (p.members.length >= 4) {
         alert('Project is full')
         return
       }
-
-      await addDoc(collection(db, 'joinRequests'), {
+      
+      await addDoc(collection(db,'joinRequests'), {
         userId,
         projectId: p.projectId,
         status: 'pending',
-        requestedAt: Timestamp.now(),
+        requestedAt: Timestamp.now()
       })
-
+      
       alert('Join request submitted successfully! An admin will review your request.')
-    } catch (e: any) {
+    }catch(e:any){ 
       console.error('Failed to submit join request:', e)
-      alert('Failed to submit join request. Please try again.')
+      alert('Failed to submit join request. Please try again.') 
     }
   }
 
@@ -137,22 +141,22 @@ export default function Projects() {
     if (!userId) return alert('Sign in required')
     const db = getDbClient()
     try {
-      const requests = await getDocs(
-        query(
-          collection(db, 'joinRequests'),
-          where('userId', '==', userId),
-          where('projectId', '==', projectId),
-          where('status', '==', 'pending')
-        )
-      )
-
+      // Find and delete the pending request
+      const requests = await getDocs(query(
+        collection(db, 'joinRequests'),
+        where('userId', '==', userId),
+        where('projectId', '==', projectId),
+        where('status', '==', 'pending')
+      ))
+      
       if (requests.empty) {
         alert('No pending request found')
         return
       }
-
-      await Promise.all(requests.docs.map((doc) => deleteDoc(doc.ref)))
-
+      
+      // Delete the request
+      await Promise.all(requests.docs.map(doc => deleteDoc(doc.ref)))
+      
       alert('Join request withdrawn successfully!')
     } catch (e: any) {
       console.error('Failed to withdraw request:', e)
@@ -160,25 +164,25 @@ export default function Projects() {
     }
   }
 
-            const leave = async (p: Project) => {
-              if (!userId) return
-              const db = getDbClient()
-              try {
-                await runTransaction(db, async (tx) => {
-                  const pref = doc(db, 'projects', p.projectId)
-                  const psnap = await tx.get(pref)
-                  const members = (psnap.data() as any).members || []
-
-                  const uref = doc(db, 'users', userId)
-
-                  tx.update(pref, { members: members.filter((m: any) => m !== userId) })
-                  tx.update(uref, { projectId: null })
-                })
-              } catch (e: any) {
-                console.error(e)
-                alert('Failed to leave project')
-              }
-            }
+  const leave = async(p:Project)=>{
+    if(!userId) return
+    const db = getDbClient()
+    try{
+      await runTransaction(db, async(tx)=>{
+        // First, perform all reads
+        const pref = doc(db,'projects',p.projectId)
+        const psnap = await tx.get(pref)
+        const members = (psnap.data() as any).members || []
+        
+        // Get user reference (no read needed here, just the reference)
+        const uref = doc(db,'users',userId)
+        
+        // Now perform all writes after all reads are complete
+        tx.update(pref,{members: members.filter((m:any)=>m!==userId)})
+        tx.update(uref,{projectId: null})
+      })
+    }catch(e:any){ console.error(e); alert('Failed to leave project') }
+  }
 
             const getDepartmentName = (deptId: string | null | undefined): string => {
               if (!deptId) return 'Unassigned'
@@ -328,4 +332,4 @@ export default function Projects() {
                 </main>
               </div>
             )
-          }
+}

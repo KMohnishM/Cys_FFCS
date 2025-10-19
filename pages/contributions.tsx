@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { getAuthClient, getDbClient, getStorageClient } from '../lib/firebase'
@@ -15,7 +15,6 @@ import {
   serverTimestamp,
   query,
   where,
-  orderBy,
   onSnapshot,
   doc,
   updateDoc,
@@ -38,6 +37,34 @@ export default function Contributions() {
   const [userProjects, setUserProjects] = useState<any[]>([])
   const [allProjects, setAllProjects] = useState<any[]>([])
   const [userRole, setUserRole] = useState<string | null>(null)
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'verified' | 'rejected'>('all')
+
+  const projectScopedContribs = useMemo(() => {
+    if (!selectedProject) return contribs
+    return contribs.filter((c) => c.projectId === selectedProject.id)
+  }, [contribs, selectedProject])
+
+  const statusCounts = useMemo(() => {
+    const counts: { all: number; pending: number; verified: number; rejected: number } = {
+      all: projectScopedContribs.length,
+      pending: 0,
+      verified: 0,
+      rejected: 0,
+    }
+
+    projectScopedContribs.forEach((c) => {
+      if (c.status === 'pending') counts.pending += 1
+      if (c.status === 'verified') counts.verified += 1
+      if (c.status === 'rejected') counts.rejected += 1
+    })
+
+    return counts
+  }, [projectScopedContribs])
+
+  const visibleContribs = useMemo(() => {
+    if (statusFilter === 'all') return projectScopedContribs
+    return projectScopedContribs.filter((c) => c.status === statusFilter)
+  }, [projectScopedContribs, statusFilter])
 
   useEffect(() => {
     // guard: only run in browser
@@ -142,6 +169,9 @@ export default function Contributions() {
       
       snap.forEach((d) => {
         const data = d.data() as any
+        const rawCreated = data.createdAt
+  const createdAt = rawCreated?.toDate ? rawCreated.toDate() : rawCreated instanceof Date ? rawCreated : new Date()
+
         list.push({
           contribId: d.id,
           userId: data.userId,
@@ -161,10 +191,13 @@ export default function Contributions() {
       
       console.log(`Found ${list.length} contributions`)
       setContribs(list)
+    }, (err) => {
+      console.error('Failed to load contributions', err)
+      setContribs([])
     })
 
     return () => unsub()
-  }, [user, selectedProject])
+  }, [user?.uid])
 
   const signIn = async () => {
     const auth = getAuthClient()
@@ -253,11 +286,13 @@ export default function Contributions() {
         imageUrl = json.url
       }
 
-  const db = getDbClient()
-  const col = collection(db, 'contributions')
+      const db = getDbClient()
+      const col = collection(db, 'contributions')
+      const projectIdForContrib = selectedProject ? selectedProject.id : null
+
       const docRef = await addDoc(col, {
         userId: user.uid,
-        projectId: selectedProject ? selectedProject.id : null,
+        projectId: projectIdForContrib,
         text: text.trim(),
         imageUrl: imageUrl || null,
         status: 'pending',
@@ -267,6 +302,34 @@ export default function Contributions() {
 
       // update contribId field for convenience (optional)
       await updateDoc(doc(db, 'contributions', docRef.id), { contribId: docRef.id })
+
+      const optimisticContribution: Contribution = {
+        contribId: docRef.id,
+        userId: user.uid,
+        projectId: projectIdForContrib ?? undefined,
+        text: text.trim(),
+        imageUrl: imageUrl || undefined,
+        status: 'pending',
+        pointsAwarded: 0,
+        createdAt: new Date(),
+      }
+
+      setContribs((prev) => {
+        if (prev.some((item) => item.contribId === docRef.id)) {
+          return prev
+        }
+        return [optimisticContribution, ...prev]
+      })
+      setStatusFilter('pending')
+
+      void trackEvent('contribution_submit', {
+        metadata: {
+          contributionId: docRef.id,
+          projectId: projectIdForContrib ?? 'general',
+          projectName: selectedProject?.name ?? 'General',
+          hasImage: Boolean(imageUrl),
+        },
+      })
 
       setText('')
       setFile(null)
