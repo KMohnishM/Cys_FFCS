@@ -21,6 +21,16 @@ export default function Navigation({ userRole }: NavigationProps) {
     return () => unsub()
   }, [])
 
+  useEffect(() => {
+    const handleRouteChange = () => setMenuOpen(false)
+    router.events?.on('routeChangeComplete', handleRouteChange)
+    router.events?.on('hashChangeComplete', handleRouteChange)
+    return () => {
+      router.events?.off('routeChangeComplete', handleRouteChange)
+      router.events?.off('hashChangeComplete', handleRouteChange)
+    }
+  }, [router.events])
+
   const handleSignOut = async () => {
     try {
       await signOut()
@@ -43,48 +53,51 @@ export default function Navigation({ userRole }: NavigationProps) {
   const isActive = (path: string) => router.pathname === path
 
   return (
-    <nav className="sticky top-0 z-50 border-b border-white bg-black">
-      <div className="page-shell py-4">
-        <div className="flex items-center justify-between">
-          <Link href={user ? '/dashboard' : '/'} className="flex items-center gap-3 uppercase tracking-[0.3em] text-sm font-bold">
+    <nav className="sticky top-0 z-50 border-b border-white bg-black/95 backdrop-blur">
+      <div className="page-shell py-3 md:py-4">
+        <div className="flex items-center justify-between gap-3">
+          <Link
+            href={user ? '/dashboard' : '/'}
+            className="flex items-center gap-2 md:gap-3 uppercase tracking-[0.28em] text-xs md:text-sm font-bold"
+          >
             <span aria-hidden="true">+----+</span>
             <span>CFFCS</span>
           </Link>
 
-          <div className="hidden md:flex items-center gap-2">
+          <div className="hidden md:flex items-center gap-2 xl:gap-3">
             {navItems.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`ascii-link ${isActive(item.href) ? 'ascii-link-active' : ''}`}
+                className={`ascii-link text-[11px] lg:text-xs ${isActive(item.href) ? 'ascii-link-active' : ''}`}
               >
                 {item.label}
               </Link>
             ))}
             {userRole && (userRole === 'admin' || userRole === 'superadmin') && (
-              <Link href="/admin" className={`ascii-link ${isActive('/admin') ? 'ascii-link-active' : ''}`}>
+              <Link href="/admin" className={`ascii-link text-[11px] lg:text-xs ${isActive('/admin') ? 'ascii-link-active' : ''}`}>
                 Admin
               </Link>
             )}
           </div>
 
-          <div className="hidden md:flex items-center gap-3 text-xs uppercase tracking-[0.18em]">
+          <div className="hidden md:flex items-center gap-2 text-[11px] lg:text-xs uppercase tracking-[0.18em]">
             {user ? (
               <>
                 <span className="ascii-meta">{user.displayName || user.email}</span>
-                <button onClick={handleSignOut} className="ascii-button text-xs px-3 py-2">
+                <button onClick={handleSignOut} className="ascii-button text-[11px] lg:text-xs px-3 py-2">
                   Sign Out
                 </button>
               </>
             ) : (
-              <Link href="/home" className="ascii-button text-xs px-3 py-2">
+              <Link href="/home" className="ascii-button text-[11px] lg:text-xs px-3 py-2">
                 Sign In
               </Link>
             )}
           </div>
 
           <button
-            className="md:hidden ascii-button text-xs px-3 py-2"
+            className="md:hidden ascii-button text-[11px] px-3 py-2"
             onClick={() => setMenuOpen((prev) => !prev)}
             aria-label="Toggle navigation"
           >
@@ -98,7 +111,7 @@ export default function Navigation({ userRole }: NavigationProps) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`ascii-link ${isActive(item.href) ? 'ascii-link-active' : ''}`}
+                className={`ascii-link text-sm ${isActive(item.href) ? 'ascii-link-active' : ''}`}
                 onClick={() => setMenuOpen(false)}
               >
                 {item.label}
@@ -107,7 +120,7 @@ export default function Navigation({ userRole }: NavigationProps) {
             {userRole && (userRole === 'admin' || userRole === 'superadmin') && (
               <Link
                 href="/admin"
-                className={`ascii-link ${isActive('/admin') ? 'ascii-link-active' : ''}`}
+                className={`ascii-link text-sm ${isActive('/admin') ? 'ascii-link-active' : ''}`}
                 onClick={() => setMenuOpen(false)}
               >
                 Admin

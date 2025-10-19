@@ -194,7 +194,7 @@ export default function ProjectPage(){
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen bg-black text-white flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-cyscom"></div>
       </div>
     );
@@ -202,11 +202,11 @@ export default function ProjectPage(){
 
   if (!project) {
     return (
-      <div className="min-h-screen p-8 container mx-auto">
-        <div className="max-w-3xl mx-auto bg-pagebg/60 rounded-xl p-6 backdrop-blur-md shadow-lg text-center">
-          <h2 className="text-2xl font-semibold text-white">Project not found</h2>
-          <p className="text-slate-300 mt-2">The requested project could not be found.</p>
-          <Link href="/projects" className="mt-4 inline-block px-4 py-2 bg-cyscom text-black rounded hover:bg-cyscom/90 transition-colors">
+      <div className="min-h-screen bg-black text-white py-16 px-4">
+        <div className="max-w-3xl mx-auto bg-pagebg/60 rounded-xl p-6 sm:p-8 backdrop-blur-md shadow-lg text-center">
+          <h2 className="text-xl sm:text-2xl font-semibold text-white">Project not found</h2>
+          <p className="text-slate-300 mt-2 text-sm sm:text-base">The requested project could not be found.</p>
+          <Link href="/projects" className="mt-6 inline-block px-4 py-2 bg-cyscom text-black rounded hover:bg-cyscom/90 transition-colors text-sm">
             Back to Projects
           </Link>
         </div>
@@ -217,10 +217,10 @@ export default function ProjectPage(){
   const isMember = (project.members || []).includes(userId);
 
   return (
-    <div className="min-h-screen p-8 container mx-auto">
-      <div className="max-w-3xl mx-auto bg-pagebg/60 rounded-xl p-6 backdrop-blur-md shadow-lg">
-        <div className="flex items-center justify-between mb-4">
-          <Link href="/projects" className="text-cyscom hover:text-cyscom/90 transition-colors flex items-center">
+    <div className="min-h-screen bg-black text-white py-6 sm:py-12 px-4 sm:px-6">
+      <div className="max-w-4xl mx-auto bg-pagebg/60 rounded-xl p-5 sm:p-8 backdrop-blur-md shadow-lg space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Link href="/projects" className="text-cyscom hover:text-cyscom/90 transition-colors flex items-center text-sm">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
@@ -233,10 +233,12 @@ export default function ProjectPage(){
           )}
         </div>
 
-        <h2 className="text-2xl font-semibold text-white">{project.name}</h2>
-        <p className="text-slate-300 mt-2">{project.description}</p>
+        <div className="space-y-3">
+          <h2 className="text-2xl sm:text-3xl font-semibold text-white leading-tight">{project.name}</h2>
+          <p className="text-slate-300 text-sm sm:text-base leading-relaxed">{project.description}</p>
+        </div>
 
-        <div className="mt-6 p-4 rounded bg-black/30">
+        <div className="p-4 sm:p-5 rounded bg-black/30 space-y-4">
           <h4 className="text-lg text-white flex items-center">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
@@ -245,7 +247,7 @@ export default function ProjectPage(){
             <span className="ml-2 text-sm text-slate-400">({members.length}/4)</span>
           </h4>
           {members.length > 0 ? (
-            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {members.map(m => (
                 <div key={m.uid} className="p-2 bg-black/20 rounded flex items-center">
                   <div className="w-8 h-8 rounded-full bg-cyscom/30 text-cyscom flex items-center justify-center mr-2">
@@ -264,8 +266,8 @@ export default function ProjectPage(){
         </div>
 
         {/* Project Contributions Section */}
-        <div className="mt-6">
-          <h4 className="text-lg text-white flex items-center justify-between">
+        <div className="space-y-4">
+          <h4 className="text-lg text-white flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -283,24 +285,24 @@ export default function ProjectPage(){
           </h4>
 
           {isMember ? (
-            <div className="mt-3 p-4 bg-black/20 rounded">
-              <p className="text-slate-300">Submit your contributions for this project to earn points!</p>
-              <div className="mt-3 flex justify-between items-center">
-                <div>
-                  <ul className="text-sm text-slate-400 list-disc pl-5">
+            <div className="p-4 bg-black/20 rounded space-y-4">
+              <p className="text-slate-300 text-sm sm:text-base">Submit your contributions for this project to earn points!</p>
+              <div className="flex flex-col sm:flex-row justify-between gap-4 sm:items-center">
+                <div className="flex-1">
+                  <ul className="text-xs sm:text-sm text-slate-400 list-disc pl-5 space-y-1">
                     <li>Include details of your work</li>
                     <li>Add screenshots or images if applicable</li>
                     <li>Admins will review and award points</li>
                   </ul>
                 </div>
-                <Link href={`/contributions?projectId=${project.projectId}`} className="px-4 py-2 bg-cyscom text-black rounded hover:bg-cyscom/90 transition-colors">
+                <Link href={`/contributions?projectId=${project.projectId}`} className="self-start sm:self-auto px-4 py-2 bg-cyscom text-black rounded hover:bg-cyscom/90 transition-colors text-sm">
                   Add Contribution
                 </Link>
               </div>
             </div>
           ) : (
-            <div className="mt-3 p-4 bg-black/20 rounded text-center">
-              <p className="text-slate-300 mb-4">Join this project to submit contributions</p>
+            <div className="p-4 bg-black/20 rounded text-center space-y-4">
+              <p className="text-slate-300 text-sm sm:text-base">Join this project to submit contributions</p>
               {!isMember && userId && (
                 <div>
                   {hasPendingRequest ? (
@@ -308,7 +310,7 @@ export default function ProjectPage(){
                       <div className="text-yellow-400 text-sm">Your join request is pending approval</div>
                       <button 
                         onClick={withdrawRequest} 
-                        className="px-6 py-2 bg-yellow-600/50 text-yellow-400 border border-yellow-700/50 rounded hover:bg-yellow-600/70 transition-colors"
+                        className="px-6 py-2 bg-yellow-600/50 text-yellow-400 border border-yellow-700/50 rounded hover:bg-yellow-600/70 transition-colors text-sm"
                       >
                         Withdraw Request
                       </button>
@@ -317,7 +319,7 @@ export default function ProjectPage(){
                     <button 
                       onClick={requestToJoin} 
                       disabled={requesting}
-                      className={`px-6 py-2 rounded flex items-center mx-auto ${
+                      className={`px-6 py-2 rounded flex items-center justify-center mx-auto text-sm ${
                         requesting 
                           ? 'bg-gray-600 text-gray-300 cursor-not-allowed' 
                           : 'bg-cyscom text-black hover:bg-cyscom/90 transition-colors'
@@ -339,7 +341,7 @@ export default function ProjectPage(){
         </div>
 
         {/* Project Reviews Section */}
-        <div className="mt-6">
+        <div className="space-y-4">
           <h4 className="text-lg text-white flex items-center">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
@@ -347,21 +349,21 @@ export default function ProjectPage(){
             Reviews
             <span className="ml-2 text-sm text-slate-400">({reviews.length})</span>
           </h4>
-          
-          {isMember && (
-            <div className="mt-4 p-3 bg-black/20 rounded">
+
+          {isMember ? (
+            <div className="p-3 bg-black/20 rounded space-y-3">
               <textarea 
                 value={comment} 
                 onChange={(e)=>setComment(e.target.value)} 
                 placeholder="Add your review..."
-                className="w-full p-3 bg-black/20 text-white rounded resize-none focus:outline-none focus:ring-1 focus:ring-cyscom" 
+                className="w-full p-3 bg-black/20 text-white rounded resize-none focus:outline-none focus:ring-1 focus:ring-cyscom text-sm" 
                 rows={3}
               />
-              <div className="mt-2 flex justify-end">
+              <div className="flex justify-end">
                 <button 
                   onClick={submitReview} 
                   disabled={submitting || !comment.trim()}
-                  className={`px-4 py-1.5 rounded flex items-center ${
+                  className={`px-4 py-1.5 rounded flex items-center text-sm ${
                     submitting || !comment.trim() 
                       ? 'bg-gray-600 text-gray-300 cursor-not-allowed' 
                       : 'bg-cyscom text-black hover:bg-cyscom/90 transition-colors'
@@ -377,29 +379,28 @@ export default function ProjectPage(){
                 </button>
               </div>
             </div>
-          )}
-          
-          {!isMember && (
-            <div className="mt-4 p-4 bg-black/20 rounded text-center">
-              <p className="text-slate-300">Join this project to add reviews</p>
-              <Link href="/projects" className="mt-2 inline-block px-3 py-1 bg-cyscom text-black rounded hover:bg-cyscom/90 transition-colors">
+          ) : (
+            <div className="p-4 bg-black/20 rounded text-center space-y-3">
+              <p className="text-slate-300 text-sm sm:text-base">Join this project to add reviews</p>
+              <Link href="/projects" className="inline-block px-3 py-1 bg-cyscom text-black rounded hover:bg-cyscom/90 transition-colors text-sm">
                 Go to Projects
               </Link>
             </div>
           )}
-          
-          <div className="mt-4 space-y-3">
-            {reviews.map(r => (
-              <div key={r.id} className="p-3 bg-black/20 rounded">
-                <p className="text-white">{r.comment}</p>
-                <div className="mt-2 flex justify-between items-center text-xs text-slate-400">
-                  <div className="font-medium">By {r.userName || r.userId}</div>
-                  <div>{new Date(r.createdAt).toLocaleString()}</div>
+
+          <div className="space-y-3">
+            {reviews.length > 0 ? (
+              reviews.map(r => (
+                <div key={r.id} className="p-3 bg-black/20 rounded space-y-2">
+                  <p className="text-white text-sm sm:text-base leading-relaxed">{r.comment}</p>
+                  <div className="flex flex-wrap justify-between items-center gap-2 text-xs text-slate-400">
+                    <div className="font-medium">By {r.userName || r.userId}</div>
+                    <div>{new Date(r.createdAt).toLocaleString()}</div>
+                  </div>
                 </div>
-              </div>
-            ))}
-            {reviews.length === 0 && (
-              <div className="p-4 bg-black/20 rounded text-center text-slate-400">No reviews yet</div>
+              ))
+            ) : (
+              <div className="p-4 bg-black/20 rounded text-center text-slate-400 text-sm">No reviews yet</div>
             )}
           </div>
         </div>

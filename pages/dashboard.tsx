@@ -60,7 +60,7 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-black text-white">
       <Navigation userRole={userData?.role} />
-      <main className="page-shell">
+      <main className="page-shell py-8 sm:py-10">
         {loading ? (
           <div className="ascii-card text-center space-y-3">
             <span className="ascii-card-top" aria-hidden="true">+----------------------+</span>
@@ -69,22 +69,22 @@ export default function Dashboard() {
             <span className="ascii-card-bottom" aria-hidden="true">+----------------------+</span>
           </div>
         ) : (
-          <div className="ascii-stack">
+          <div className="ascii-stack gap-6">
             <header className="space-y-2">
-              <h1 className="ascii-title">Welcome</h1>
+              <h1 className="ascii-title text-2xl sm:text-3xl">Welcome</h1>
               <hr className="ascii-rule" />
-              <div className="text-sm uppercase tracking-[0.16em]">
+              <div className="text-xs sm:text-sm uppercase tracking-[0.14em] sm:tracking-[0.16em]">
                 {user?.displayName || user?.email || 'Member'}
               </div>
               <p className="ascii-footnote">Dashboard overview. Nothing fancy.</p>
             </header>
 
-            <section className="grid gap-3 md:grid-cols-2">
+            <section className="grid gap-3 sm:grid-cols-2">
               <div className="ascii-card">
                 <span className="ascii-card-top" aria-hidden="true">+-----------+</span>
                 <div className="space-y-2">
-                  <p className="ascii-meta">Points</p>
-                  <p className="text-3xl tracking-[0.08em]">{totalPoints.toString().padStart(3, '0')}</p>
+                  <p className="ascii-meta text-xs sm:text-sm">Points</p>
+                  <p className="text-2xl sm:text-3xl tracking-[0.08em]">{totalPoints.toString().padStart(3, '0')}</p>
                   <p className="ascii-footnote">Awarded across verified contributions.</p>
                 </div>
                 <span className="ascii-card-bottom" aria-hidden="true">+-----------+</span>
@@ -93,8 +93,8 @@ export default function Dashboard() {
               <div className="ascii-card">
                 <span className="ascii-card-top" aria-hidden="true">+-----------+</span>
                 <div className="space-y-2">
-                  <p className="ascii-meta">Contributions</p>
-                  <p className="text-3xl tracking-[0.08em]">{contributionsCount.toString().padStart(2, '0')}</p>
+                  <p className="ascii-meta text-xs sm:text-sm">Contributions</p>
+                  <p className="text-2xl sm:text-3xl tracking-[0.08em]">{contributionsCount.toString().padStart(2, '0')}</p>
                   <p className="ascii-footnote">Submissions logged under your ID.</p>
                 </div>
                 <span className="ascii-card-bottom" aria-hidden="true">+-----------+</span>
@@ -105,11 +105,11 @@ export default function Dashboard() {
               <span className="ascii-card-top" aria-hidden="true">+-----------------------+</span>
               <div className="space-y-2">
                 <p className="ascii-meta">Next Actions</p>
-                <div className="flex flex-col md:flex-row gap-3">
-                  <Link href="/contributions" className="ascii-button flex-1 text-center">
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Link href="/contributions" className="ascii-button flex-1 text-center text-[11px] sm:text-xs py-3">
                     Add Contribution
                   </Link>
-                  <Link href="/projects" className="ascii-button flex-1 text-center">
+                  <Link href="/projects" className="ascii-button flex-1 text-center text-[11px] sm:text-xs py-3">
                     Explore Projects
                   </Link>
                 </div>
@@ -121,8 +121,8 @@ export default function Dashboard() {
             {userData?.departments && userData.departments.length > 0 && (
               <section className="ascii-card space-y-3">
                 <span className="ascii-card-top" aria-hidden="true">+-----------------------+</span>
-                <p className="ascii-meta">Department</p>
-                <ul className="ascii-list text-sm tracking-[0.04em] normal-case">
+                <p className="ascii-meta text-xs sm:text-sm">Department</p>
+                <ul className="ascii-list text-xs sm:text-sm tracking-[0.04em] normal-case">
                   {userData.departments.map((dept: string) => (
                     <li key={dept}>{dept}</li>
                   ))}
@@ -131,7 +131,7 @@ export default function Dashboard() {
               </section>
             )}
 
-            <footer className="ascii-footnote text-center uppercase tracking-[0.18em]">
+            <footer className="ascii-footnote text-center uppercase tracking-[0.16em] sm:tracking-[0.18em]">
               Stay monochrome. Stay consistent.
             </footer>
           </div>

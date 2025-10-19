@@ -135,15 +135,15 @@ export default function Departments() {
   return (
     <div className="min-h-screen bg-black text-white">
       <Navigation userRole={userRole} />
-      <main className="page-shell">
-        <div className="ascii-stack">
-          <header className="space-y-2">
-            <h1 className="ascii-title">Department Selection</h1>
+      <main className="page-shell py-8 sm:py-10">
+        <div className="ascii-stack gap-6">
+          <header className="space-y-2 text-center sm:text-left">
+            <h1 className="ascii-title text-2xl sm:text-3xl">Department Selection</h1>
             <hr className="ascii-rule" />
-            <p className="ascii-footnote">Select exactly two departments. Lock-in is final.</p>
+            <p className="ascii-footnote text-xs sm:text-sm">Select exactly two departments. Lock-in is final.</p>
           </header>
 
-          <section className="grid gap-3 md:grid-cols-2">
+          <section className="grid gap-3 sm:grid-cols-2">
             {departments.map((dept) => {
               const isSelected = selected.includes(dept.deptId)
               const isFull = dept.capacity > 0 && dept.filledCount >= dept.capacity
@@ -156,16 +156,16 @@ export default function Departments() {
                   onClick={() => {
                     if (!disabled) toggle(dept.deptId)
                   }}
-                  className={`ascii-card text-left space-y-3 ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                  className={`ascii-card text-left space-y-3 transition-transform hover:translate-y-[-2px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
                 >
                   <span className="ascii-card-top" aria-hidden="true">+-----------------------+</span>
                   <div className="space-y-2">
-                    <p className="ascii-meta">{dept.deptId}</p>
-                    <h2 className="text-xl uppercase tracking-[0.18em]">{dept.name}</h2>
-                    <p className="ascii-footnote">
+                    <p className="ascii-meta text-xs sm:text-sm">{dept.deptId}</p>
+                    <h2 className="text-lg sm:text-xl uppercase tracking-[0.16em] sm:tracking-[0.18em]">{dept.name}</h2>
+                    <p className="ascii-footnote text-xs sm:text-sm">
                       Seats {String(dept.filledCount).padStart(2, '0')} / {dept.capacity || '∞'}
                     </p>
-                    <div className="ascii-tag">
+                    <div className="ascii-tag text-[11px] sm:text-xs">
                       {isSelected ? 'Selected' : isFull ? 'Full' : 'Available'}
                     </div>
                   </div>
@@ -177,22 +177,22 @@ export default function Departments() {
 
           <section className="ascii-card space-y-4">
             <span className="ascii-card-top" aria-hidden="true">+-----------------------+</span>
-            <div className="flex flex-col md:flex-row gap-3">
-              <Link href="/dashboard" className="ascii-button flex-1 text-center">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Link href="/dashboard" className="ascii-button flex-1 text-center text-[11px] sm:text-xs py-3">
                 Back To Dashboard
               </Link>
               <button
                 onClick={confirm}
                 disabled={locked || loading || selected.length !== 2}
-                className="ascii-button flex-1 text-center"
+                className="ascii-button flex-1 text-center text-[11px] sm:text-xs py-3"
               >
                 {locked ? 'Selection Locked' : loading ? 'Processing...' : 'Lock In Departments'}
               </button>
             </div>
             {!locked && selected.length !== 2 && (
-              <p className="ascii-footnote">Choose two departments before locking in.</p>
+              <p className="ascii-footnote text-xs sm:text-sm">Choose two departments before locking in.</p>
             )}
-            {locked && <p className="ascii-footnote">Contact an admin to request changes.</p>}
+            {locked && <p className="ascii-footnote text-xs sm:text-sm">Contact an admin to request changes.</p>}
             <span className="ascii-card-bottom" aria-hidden="true">+-----------------------+</span>
           </section>
 

@@ -147,31 +147,36 @@ export default function Landing() {
       <Head>
         <title>Cyscom FFCS | Home</title>
       </Head>
-      <div className="page-shell relative">
+      <div className="page-shell relative pb-14 md:pb-20">
         <div className="ascii-stack items-center text-center space-y-6">
           <header className="space-y-3">
-            <p className="ascii-divider" aria-hidden="true">{'='.repeat(56)}</p>
-            <h1 className="text-4xl uppercase tracking-[0.4em]">Cyscom FFCS</h1>
-            <p className="text-xs uppercase tracking-[0.16em] opacity-80">Campus Ops. Monochrome Mode.</p>
+            <p className="ascii-divider text-xs sm:text-sm md:text-base" aria-hidden="true">{'='.repeat(56)}</p>
+            <h1 className="text-2xl sm:text-3xl md:text-4xl uppercase tracking-[0.28em] sm:tracking-[0.34em] md:tracking-[0.4em]">Cyscom FFCS</h1>
+            <p className="text-[10px] sm:text-xs uppercase tracking-[0.12em] md:tracking-[0.16em] opacity-80">Campus Ops. Monochrome Mode.</p>
           </header>
 
-          <section className="ascii-card inline-block">
+          <section className="ascii-card inline-block max-w-full overflow-hidden">
             <span className="ascii-card-top" aria-hidden="true">+------------------------------+</span>
-            <div className="px-6 py-8 space-y-6">
+            <div className="px-4 sm:px-6 py-6 sm:py-8 space-y-6">
               <div className="space-y-1">
                 {displayLines.slice(0, Math.floor(displayLines.length / 2)).map((line, index) => (
-                  <pre key={`top-${index}`} className="text-[10px] md:text-xs whitespace-pre leading-4 transition-all duration-300">
+                  <pre
+                    key={`top-${index}`}
+                    className="text-[9px] xs:text-[10px] sm:text-[11px] md:text-xs whitespace-pre leading-4 transition-all duration-300 break-words"
+                  >
                     {line}
                   </pre>
                 ))}
               </div>
               <div className="space-y-2">
-                <p className="text-xs uppercase tracking-[0.18em] opacity-80">Welcome To The ASCII Vault</p>
+                <p className="text-[11px] sm:text-xs uppercase tracking-[0.14em] sm:tracking-[0.18em] opacity-80">
+                  Welcome To The ASCII Vault
+                </p>
                 <button
                   type="button"
                   onClick={handleEnterPortal}
                   disabled={isAnimating}
-                  className="ascii-button text-xs mx-auto"
+                  className="ascii-button text-[11px] sm:text-xs mx-auto px-4 sm:px-6"
                 >
                   {isAnimating ? 'Initializing Warp...' : 'Enter Portal'}
                 </button>
@@ -179,7 +184,10 @@ export default function Landing() {
               </div>
               <div className="space-y-1">
                 {displayLines.slice(Math.floor(displayLines.length / 2)).map((line, index) => (
-                  <pre key={`bottom-${index}`} className="text-[10px] md:text-xs whitespace-pre leading-4 transition-all duration-300">
+                  <pre
+                    key={`bottom-${index}`}
+                    className="text-[9px] xs:text-[10px] sm:text-[11px] md:text-xs whitespace-pre leading-4 transition-all duration-300 break-words"
+                  >
                     {line}
                   </pre>
                 ))}
@@ -194,7 +202,9 @@ export default function Landing() {
             <p className="text-sm leading-relaxed tracking-[0.06em] normal-case">
               Choose your battlestations, lock two departments, claim a project, and feed the contribution vault. Every action updates the grid.
             </p>
-            <p className="ascii-footnote uppercase tracking-[0.2em]">Trigger the blast whenever you are ready to breach.</p>
+            <p className="ascii-footnote uppercase tracking-[0.18em] sm:tracking-[0.2em]">
+              Trigger the blast whenever you are ready to breach.
+            </p>
           </section>
         </div>
       </div>

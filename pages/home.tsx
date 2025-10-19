@@ -100,15 +100,17 @@ export default function SignIn() {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      <div className="page-shell">
-        <div className="ascii-stack max-w-xl mx-auto">
+      <div className="page-shell py-10 sm:py-12">
+        <div className="ascii-stack max-w-md sm:max-w-lg mx-auto gap-6">
           <header className="space-y-3 text-center">
-            <p className="ascii-divider" aria-hidden="true">{'='.repeat(48)}</p>
-            <h1 className="text-3xl uppercase tracking-[0.28em]">Cyscom FFCS Portal</h1>
-            <p className="text-xs uppercase tracking-[0.14em] opacity-80">
+            <p className="ascii-divider text-xs sm:text-sm" aria-hidden="true">{'='.repeat(48)}</p>
+            <h1 className="text-2xl sm:text-3xl uppercase tracking-[0.22em] sm:tracking-[0.28em]">
+              Cyscom FFCS Portal
+            </h1>
+            <p className="text-[11px] sm:text-xs uppercase tracking-[0.12em] opacity-80">
               Monochrome interface ahead. Google sign-ins only.
             </p>
-            <Link href="/" className="ascii-link text-xs">
+            <Link href="/" className="ascii-link text-[11px] sm:text-xs">
               Visit Home Page
             </Link>
           </header>
@@ -117,19 +119,23 @@ export default function SignIn() {
             <span className="ascii-card-top" aria-hidden="true">+------------------------------+</span>
             {isAuthenticated ? (
               <div className="space-y-3">
-                <p className="text-xs uppercase tracking-[0.12em]">You are signed in. Redirecting...</p>
-                <p className="text-sm" aria-hidden="true">[ \\ ] [ | ] [ / ] [ - ]</p>
-                <Link href="/dashboard" className="ascii-button text-xs">
+                <p className="text-[11px] sm:text-xs uppercase tracking-[0.12em]">You are signed in. Redirecting...</p>
+                <p className="text-xs sm:text-sm" aria-hidden="true">[ \\ ] [ | ] [ / ] [ - ]</p>
+                <Link href="/dashboard" className="ascii-button text-[11px] sm:text-xs">
                   Go To Dashboard
                 </Link>
               </div>
             ) : (
               <div className="space-y-5">
-                <button onClick={handleGoogleSignIn} disabled={loading} className="ascii-button w-full">
+                <button
+                  onClick={handleGoogleSignIn}
+                  disabled={loading}
+                  className="ascii-button w-full text-[11px] sm:text-xs py-3 sm:py-3.5"
+                >
                   {loading ? 'Signing In...' : 'Sign In With Google'}
                 </button>
-                <div className="space-y-2 text-xs">
-                  <button onClick={toggleAdminLogin} className="ascii-link text-xs">
+                <div className="space-y-2 text-[11px] sm:text-xs">
+                  <button onClick={toggleAdminLogin} className="ascii-link text-[11px] sm:text-xs">
                     {showAdminLogin ? 'Close Admin Login' : 'Admin?'}
                   </button>
                   <p className="ascii-footnote">Only @vitstudent.ac.in accounts.</p>
@@ -137,28 +143,32 @@ export default function SignIn() {
                 {showAdminLogin && (
                   <div className="space-y-3 text-left">
                     <div>
-                      <label htmlFor="email" className="ascii-label">Email</label>
+                      <label htmlFor="email" className="ascii-label text-[11px] sm:text-xs">Email</label>
                       <input
                         id="email"
                         type="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        className="ascii-input"
+                        className="ascii-input text-sm"
                         placeholder="admin@example.com"
                       />
                     </div>
                     <div>
-                      <label htmlFor="password" className="ascii-label">Password</label>
+                      <label htmlFor="password" className="ascii-label text-[11px] sm:text-xs">Password</label>
                       <input
                         id="password"
                         type="password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        className="ascii-input"
+                        className="ascii-input text-sm"
                         placeholder="********"
                       />
                     </div>
-                    <button onClick={handleAdminLogin} disabled={adminLoginLoading} className="ascii-button w-full">
+                    <button
+                      onClick={handleAdminLogin}
+                      disabled={adminLoginLoading}
+                      className="ascii-button w-full text-[11px] sm:text-xs py-3"
+                    >
                       {adminLoginLoading ? 'Verifying...' : 'Verify Access'}
                     </button>
                   </div>
@@ -169,7 +179,7 @@ export default function SignIn() {
           </section>
 
           <footer className="text-center">
-            <p className="ascii-divider" aria-hidden="true">{'-'.repeat(48)}</p>
+            <p className="ascii-divider text-xs" aria-hidden="true">{'-'.repeat(48)}</p>
             <p className="ascii-footnote">&copy; {new Date().getFullYear()} Cyscom VIT.</p>
           </footer>
         </div>
