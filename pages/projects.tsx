@@ -3,20 +3,18 @@ import Link from 'next/link'
 import { getAuthClient, getDbClient } from '../lib/firebase'
 import { collection, query, onSnapshot, doc, runTransaction, where, getDocs, addDoc, Timestamp, deleteDoc } from 'firebase/firestore'
 import type { Project } from '../types'
-import { UserProgress } from '../lib/useAuthGuard'
-import WorkflowSteps from '../components/WorkflowSteps'
 import Navigation from '../components/Navigation'
 
-export default function Projects(){
+export default function Projects() {
   const [projects, setProjects] = useState<Project[]>([])
-  const [userId, setUserId] = useState<string|null>(null)
-  const [userDepts, setUserDepts] = useState<string[]|null>(null)
-  const [allProjects, setAllProjects] = useState<Project[]>([])
+  const [userId, setUserId] = useState<string | null>(null)
+  const [userDepts, setUserDepts] = useState<string[] | null>(null)
   const [userRole, setUserRole] = useState<string | null>(null)
+  const [userProject, setUserProject] = useState<string | null>(null)
   const [pendingRequests, setPendingRequests] = useState<Set<string>>(new Set())
 
-  useEffect(()=>{
-    if(typeof window==='undefined') return
+  useEffect(() => {
+    if (typeof window === 'undefined') return
     const auth = getAuthClient()
     const db = getDbClient()
     const unsub = auth.onAuthStateChanged(async (u: any | null) => {
@@ -30,46 +28,50 @@ export default function Projects(){
         setUserRole(null)
       }
     })
-    return ()=>unsub()
-  },[])
+    return () => unsub()
+  }, [])
 
-  useEffect(()=>{
-    if(!userId) return
+  useEffect(() => {
+    if (!userId) {
+      setUserDepts(null);
+      setUserProject(null);
+      return;
+    }
+    
     const db = getDbClient()
-    ;(async ()=>{
+    ;(async () => {
       const { doc, getDoc } = await import('firebase/firestore')
-      const uref = doc(db,'users',userId)
+      const uref = doc(db, 'users', userId)
       const snap = await getDoc(uref)
-      if(snap.exists()){
+      if (snap.exists()) {
         const data = snap.data() as any
-        setUserDepts(data.departments || null)
+        setUserDepts(Array.isArray(data.departments) ? data.departments : null);
+        setUserProject(data.projectId || null);
       }
     })()
-  },[userId])
+  }, [userId])
 
-  useEffect(()=>{
+  useEffect(() => {
     const db = getDbClient()
-    const col = collection(db,'projects')
+    const col = collection(db, 'projects')
     const q = query(col)
-    const unsub = onSnapshot(q,(snap)=>{
+    const unsub = onSnapshot(q, (snap) => {
       const list: Project[] = []
-      snap.forEach(d=>{
+      snap.forEach((d) => {
         const data = d.data() as any
         list.push({
           projectId: d.id,
           name: data.name,
           description: data.description,
-          members: data.members || [], 
-          department: data.department || null
+          members: data.members || [],
+          department: data.department || null,
         } as Project & any)
       })
       setProjects(list)
-      setAllProjects(list)
     })
-    return ()=>unsub()
-  },[])
+    return () => unsub()
+  }, [])
 
-  // Track pending join requests
   useEffect(() => {
     if (!userId) return
     const db = getDbClient()
@@ -89,46 +91,45 @@ export default function Projects(){
     return () => unsub()
   }, [userId])
 
-  const requestToJoin = async(p:Project)=>{
-    if(!userId) return alert('Sign in required')
+  const requestToJoin = async (p: Project) => {
+    if (!userId) return alert('Sign in required')
     const db = getDbClient()
-    try{
-      // Check if user already has a pending request
-      const existingRequests = await getDocs(query(
-        collection(db, 'joinRequests'),
-        where('userId', '==', userId),
-        where('projectId', '==', p.projectId),
-        where('status', '==', 'pending')
-      ))
-      
+    try {
+      const existingRequests = await getDocs(
+        query(
+          collection(db, 'joinRequests'),
+          where('userId', '==', userId),
+          where('projectId', '==', p.projectId),
+          where('status', '==', 'pending')
+        )
+      )
+
       if (!existingRequests.empty) {
         alert('You already have a pending join request for this project')
         return
       }
-      
-      // Check if user is already a member
+
       if (p.members.includes(userId)) {
         alert('You are already a member of this project')
         return
       }
-      
-      // Check if project is full
+
       if (p.members.length >= 4) {
         alert('Project is full')
         return
       }
-      
-      await addDoc(collection(db,'joinRequests'), {
+
+      await addDoc(collection(db, 'joinRequests'), {
         userId,
         projectId: p.projectId,
         status: 'pending',
-        requestedAt: Timestamp.now()
+        requestedAt: Timestamp.now(),
       })
-      
+
       alert('Join request submitted successfully! An admin will review your request.')
-    }catch(e:any){ 
+    } catch (e: any) {
       console.error('Failed to submit join request:', e)
-      alert('Failed to submit join request. Please try again.') 
+      alert('Failed to submit join request. Please try again.')
     }
   }
 
@@ -136,22 +137,22 @@ export default function Projects(){
     if (!userId) return alert('Sign in required')
     const db = getDbClient()
     try {
-      // Find and delete the pending request
-      const requests = await getDocs(query(
-        collection(db, 'joinRequests'),
-        where('userId', '==', userId),
-        where('projectId', '==', projectId),
-        where('status', '==', 'pending')
-      ))
-      
+      const requests = await getDocs(
+        query(
+          collection(db, 'joinRequests'),
+          where('userId', '==', userId),
+          where('projectId', '==', projectId),
+          where('status', '==', 'pending')
+        )
+      )
+
       if (requests.empty) {
         alert('No pending request found')
         return
       }
-      
-      // Delete the request
-      await Promise.all(requests.docs.map(doc => deleteDoc(doc.ref)))
-      
+
+      await Promise.all(requests.docs.map((doc) => deleteDoc(doc.ref)))
+
       alert('Join request withdrawn successfully!')
     } catch (e: any) {
       console.error('Failed to withdraw request:', e)
@@ -159,185 +160,172 @@ export default function Projects(){
     }
   }
 
-  const leave = async(p:Project)=>{
-    if(!userId) return
-    const db = getDbClient()
-    try{
-      await runTransaction(db, async(tx)=>{
-        // First, perform all reads
-        const pref = doc(db,'projects',p.projectId)
-        const psnap = await tx.get(pref)
-        const members = (psnap.data() as any).members || []
-        
-        // Get user reference (no read needed here, just the reference)
-        const uref = doc(db,'users',userId)
-        
-        // Now perform all writes after all reads are complete
-        tx.update(pref,{members: members.filter((m:any)=>m!==userId)})
-        tx.update(uref,{projectId: null})
-      })
-    }catch(e:any){ console.error(e); alert('Failed to leave project') }
-  }
+            const leave = async (p: Project) => {
+              if (!userId) return
+              const db = getDbClient()
+              try {
+                await runTransaction(db, async (tx) => {
+                  const pref = doc(db, 'projects', p.projectId)
+                  const psnap = await tx.get(pref)
+                  const members = (psnap.data() as any).members || []
 
-  // Function to get department name from ID
-  const getDepartmentName = (deptId: string | null | undefined): string => {
-    if (!deptId) return "Unassigned";
-    
-    switch(deptId) {
-      case 'technical': return "Technical";
-      case 'development': return "Development";
-      case 'events': return "Events";
-      case 'social': return "Social Media";
-      case 'content': return "Content";
-      case 'design': return "Design";
-      default: return deptId;
-    }
-  };
-  
-  return (
-    <div className="min-h-screen bg-black">
-      <Navigation userRole={userRole} />
-      
-      {/* Minimalist Hero Section */}
-      <div className="relative overflow-hidden">
-        {/* Background Effects */}
-        <div className="absolute inset-0 bg-gradient-to-br from-black via-cyberdark-900 to-black"></div>
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-cyscom/5 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-cyscom/3 rounded-full blur-3xl"></div>
-        
-        {/* Grid Pattern */}
-        <div className="absolute inset-0 opacity-10">
-          <div className="h-full w-full" style={{
-            backgroundImage: `linear-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px),
-                             linear-gradient(90deg, rgba(255, 255, 255, 0.1) 1px, transparent 1px)`,
-            backgroundSize: '50px 50px'
-          }}></div>
-        </div>
+                  const uref = doc(db, 'users', userId)
 
-        <div className="relative z-10 container mx-auto px-6 py-20">
-          <div className="max-w-6xl mx-auto">
-            {/* Header */}
-            <div className="text-center mb-12">
-              <h1 className="text-5xl md:text-7xl font-bold bg-gradient-to-r from-white via-cyberblue-300 to-cyscom bg-clip-text text-transparent mb-4">
-                Projects
-              </h1>
-              <p className="text-xl md:text-2xl text-cyberblue-400 font-light">
-                Join a Project Team
-              </p>
-            </div>
+                  tx.update(pref, { members: members.filter((m: any) => m !== userId) })
+                  tx.update(uref, { projectId: null })
+                })
+              } catch (e: any) {
+                console.error(e)
+                alert('Failed to leave project')
+              }
+            }
 
-            {/* The projects list now displays all projects irrespective of user departments */}
+            const getDepartmentName = (deptId: string | null | undefined): string => {
+              if (!deptId) return 'Unassigned'
 
-            {/* No Projects Available */}
-            {projects.length === 0 && userDepts && userDepts.length > 0 && (
-              <div className="max-w-2xl mx-auto text-center">
-                <div className="bg-black/40 backdrop-blur-xl border border-cyberblue-900/50 rounded-2xl p-8">
-                  <div className="text-cyberblue-300/70 mb-6">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto text-cyscom/50 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                    No Projects Available
-                  </div>
-                  <p className="text-cyberblue-300/70">
-                    No projects found for your departments. Please contact an admin to create projects.
-                  </p>
-                </div>
-              </div>
-            )}
+              switch (deptId) {
+                case 'technical':
+                  return 'Technical'
+                case 'development':
+                  return 'Development'
+                case 'events':
+                  return 'Events'
+                case 'social':
+                  return 'Social Media'
+                case 'content':
+                  return 'Content'
+                case 'design':
+                  return 'Design'
+                default:
+                  return deptId
+              }
+            }
 
-            {/* Projects Grid */}
-            {projects.length > 0 && (
-              <>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-                  {projects.map(p => (
-                    <div 
-                      key={p.projectId} 
-                      className="group relative bg-black/40 backdrop-blur-xl border border-cyberblue-900/50 rounded-2xl p-6 hover:border-cyberblue-700/70 transition-all duration-300 transform hover:scale-105"
-                    >
-                      <div className="mb-4">
-                        <Link 
-                          href={`/project/${p.projectId}`} 
-                          className="text-xl font-bold text-white hover:text-cyscom transition-colors group-hover:text-cyscom"
-                        >
-                          {p.name}
-                        </Link>
-                        <div className="flex items-center gap-2 mt-2">
-                          <span className="inline-flex items-center px-3 py-1 bg-cyscom/20 text-cyscom text-xs rounded-full border border-cyscom/30">
-                            {getDepartmentName(p.department)}
+            return (
+              <div className="min-h-screen bg-black text-white">
+                <Navigation userRole={userRole} />
+                <main className="page-shell py-8 sm:py-10">
+                  <div className="ascii-stack gap-6">
+                    <header className="space-y-2 text-center sm:text-left">
+                      <h1 className="ascii-title text-2xl sm:text-3xl">Project Directory</h1>
+                      <hr className="ascii-rule" />
+                      <p className="ascii-footnote text-xs sm:text-sm">
+                        Browse active builds, track team capacity, and send a join request when you spot a fit.
+                      </p>
+                    </header>
+
+                    {projects.length === 0 ? (
+                      <section className="ascii-card text-center space-y-4 px-6 py-8">
+                        <div className="ascii-mono text-sm sm:text-base text-slate-300 flex flex-col items-center gap-3">
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="h-10 w-10 text-cyscom"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                          </svg>
+                          <span>No projects are open for your departments just yet.</span>
+                          <span className="ascii-footnote text-[11px] text-slate-400">
+                            {userDepts && userDepts.length > 0
+                              ? 'Ping an admin if you think this is a mistake.'
+                              : 'Pick your departments first so we can match you to projects.'}
                           </span>
                         </div>
-                      </div>
+                      </section>
+                    ) : (
+                      <section className="ascii-stack gap-5">
+                        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                          {projects.map((p) => {
+                            const isMember = p.members.includes(userId || '')
+                            const isFull = p.members.length >= 4
+                            const isPending = pendingRequests.has(p.projectId)
 
-                      <p className="text-cyberblue-300/70 text-sm mb-4 line-clamp-3">{p.description}</p>
+                            return (
+                              <article key={p.projectId} className={`ascii-card h-full flex flex-col gap-4 ${
+                                isMember ? 'border-2 relative' : ''
+                              }`}>
+                                {isMember && (
+                                  <div className="absolute top-0 right-0 transform translate-x-1/2 -translate-y-1/2 bg-white text-black px-2 py-1 text-[10px] uppercase tracking-wider font-bold">
+                                    Your Project
+                                  </div>
+                                )}
+                                <div className="space-y-2">
+                                  <div className="flex flex-wrap items-start justify-between gap-2">
+                                    <Link href={`/project/${p.projectId}`} className="ascii-link text-lg sm:text-xl">
+                                      {p.name} {isMember && '★'}
+                                    </Link>
+                                    <span className="ascii-tag text-[11px] uppercase tracking-[0.18em]">
+                                      {getDepartmentName(p.department)}
+                                    </span>
+                                  </div>
+                                  <p className="ascii-body text-xs sm:text-sm text-slate-300 leading-relaxed line-clamp-4">
+                                    {p.description}
+                                  </p>
+                                </div>
 
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-1 text-cyberblue-300/70 text-sm">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                          </svg>
-                          {p.members.length}/4 members
+                                <div className="ascii-meta text-[11px] sm:text-xs flex items-center justify-between">
+                                  <span className="flex items-center gap-1">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                                    </svg>
+                                    {p.members.length}/4 seats filled
+                                  </span>
+                                  <Link href={`/project/${p.projectId}`} className="ascii-link text-[11px] sm:text-xs">
+                                    View brief
+                                  </Link>
+                                </div>
+
+                                <div className="flex flex-col sm:flex-row gap-2">
+                                  {isMember ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => leave(p)}
+                                      className="ascii-button bg-red-900/60 text-red-200 border-red-500/60 hover:bg-red-900/80"
+                                    >
+                                      Leave project
+                                    </button>
+                                  ) : isPending ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => withdrawRequest(p.projectId)}
+                                      className="ascii-button bg-yellow-900/50 text-yellow-200 border-yellow-600/50 hover:bg-yellow-900/70"
+                                    >
+                                      Withdraw request
+                                    </button>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => requestToJoin(p)}
+                                      disabled={isFull}
+                                      className={`ascii-button ${
+                                        isFull
+                                          ? 'bg-gray-800 text-gray-500 border-gray-700 cursor-not-allowed'
+                                          : 'bg-cyscom text-black font-semibold hover:bg-cyscom/90'
+                                      }`}
+                                    >
+                                      {isFull ? 'Project full' : 'Request to join'}
+                                    </button>
+                                  )}
+                                </div>
+                              </article>
+                            )
+                          })}
                         </div>
-                        <Link 
-                          href={`/project/${p.projectId}`} 
-                          className="text-cyscom/90 text-xs hover:text-cyscom flex items-center"
-                        >
-                          View Details
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                          </svg>
-                        </Link>
-                      </div>
 
-                      <div className="flex gap-2">
-                        {p.members.includes(userId || '') ? (
-                          <button 
-                            onClick={() => leave(p)} 
-                            className="flex-1 px-4 py-2 bg-red-900/50 text-red-400 border border-red-700/50 rounded-lg hover:bg-red-900/70 transition-colors text-sm font-semibold"
-                          >
-                            Leave Project
-                          </button>
-                        ) : pendingRequests.has(p.projectId) ? (
-                          <button 
-                            onClick={() => withdrawRequest(p.projectId)} 
-                            className="flex-1 px-4 py-2 bg-yellow-600/50 text-yellow-400 border border-yellow-700/50 rounded-lg hover:bg-yellow-600/70 transition-colors text-sm font-semibold"
-                          >
-                            Withdraw Request
-                          </button>
-                        ) : (
-                          <button 
-                            onClick={() => requestToJoin(p)} 
-                            disabled={p.members.length >= 4}
-                            className={`flex-1 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                              p.members.length >= 4 
-                                ? 'bg-gray-800/50 text-gray-500 border border-gray-700/50 cursor-not-allowed' 
-                                : 'bg-gradient-to-r from-cyberblue-600 to-cyberblue-500 text-black hover:shadow-lg hover:shadow-cyberblue-500/25 transform hover:scale-105'
-                            }`}
-                          >
-                            {p.members.length >= 4 ? 'Project Full' : 'Request to Join'}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Action Buttons */}
-                <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-                  <Link 
-                    href="/dashboard" 
-                    className="px-8 py-4 border border-cyberblue-700/50 text-cyberblue-400 font-semibold rounded-xl hover:border-cyberblue-500 hover:bg-cyberblue-950/20 transition-all duration-300 backdrop-blur-sm"
-                  >
-                    Back to Dashboard
-                  </Link>
-                  <div className="text-cyberblue-300/70 text-sm">
-                    {projects.length} project{projects.length !== 1 ? 's' : ''} available
+                        <footer className="ascii-stack items-center justify-center text-center gap-3 sm:flex-row sm:gap-6">
+                          <Link href="/dashboard" className="ascii-button px-6 py-2 text-[11px] sm:text-xs">
+                            Back to dashboard
+                          </Link>
+                          <p className="ascii-meta text-[11px] sm:text-xs">
+                            {projects.length} project{projects.length !== 1 ? 's' : ''} listed in total
+                          </p>
+                        </footer>
+                      </section>
+                    )}
                   </div>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
+                </main>
+              </div>
+            )
+          }

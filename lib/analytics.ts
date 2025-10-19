@@ -11,7 +11,6 @@ export type AnalyticsEventType =
   | 'project_leave'
   | 'contribution_submit'
   | 'contribution_approve'
-  | 'contribution_reject'
   | 'user_register';
 
 // Analytics Context
