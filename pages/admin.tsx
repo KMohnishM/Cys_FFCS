@@ -218,7 +218,7 @@ export default function Admin() {
     
     try {
       await runTransaction(db, async (tx) => {
-        // First, read all existing departments for the user
+        // First, read all necessary documents
         const userRef = doc(db, 'users', userId)
         const userSnap = await tx.get(userRef)
         
@@ -229,15 +229,27 @@ export default function Admin() {
         const userData = userSnap.data()
         const oldDepts = userData.departments || []
         
+        // Read all department documents that need to be updated
+        const deptReads: Record<string, any> = {}
+        const deptsToUpdate = new Set([...oldDepts, ...departments])
+        
+        for (const deptId of deptsToUpdate) {
+          const deptRef = doc(db, 'departments', deptId)
+          const deptSnap = await tx.get(deptRef)
+          if (deptSnap.exists()) {
+            deptReads[deptId] = deptSnap.data()
+          }
+        }
+        
+        // Now perform all writes after all reads are complete
+        
         // For departments that are being removed, decrement the filledCount
         for (const oldDeptId of oldDepts) {
           if (!departments.includes(oldDeptId)) {
-            const deptRef = doc(db, 'departments', oldDeptId)
-            const deptSnap = await tx.get(deptRef)
-            
-            if (deptSnap.exists()) {
-              const deptData = deptSnap.data()
+            const deptData = deptReads[oldDeptId]
+            if (deptData) {
               const currentCount = deptData.filledCount || 0
+              const deptRef = doc(db, 'departments', oldDeptId)
               tx.update(deptRef, { filledCount: Math.max(0, currentCount - 1) })
             }
           }
@@ -246,12 +258,10 @@ export default function Admin() {
         // For departments that are being added, increment the filledCount
         for (const newDeptId of departments) {
           if (!oldDepts.includes(newDeptId)) {
-            const deptRef = doc(db, 'departments', newDeptId)
-            const deptSnap = await tx.get(deptRef)
-            
-            if (deptSnap.exists()) {
-              const deptData = deptSnap.data()
+            const deptData = deptReads[newDeptId]
+            if (deptData) {
               const currentCount = deptData.filledCount || 0
+              const deptRef = doc(db, 'departments', newDeptId)
               tx.update(deptRef, { filledCount: currentCount + 1 })
             }
           }
@@ -285,7 +295,7 @@ export default function Admin() {
     
     try {
       await runTransaction(db, async (tx) => {
-        // First, read the user document
+        // First, read all necessary documents
         const userRef = doc(db, 'users', userId)
         const userSnap = await tx.get(userRef)
         
@@ -296,14 +306,24 @@ export default function Admin() {
         const userData = userSnap.data()
         const oldDepts = userData.departments || []
         
+        // Read all department documents that need to be updated
+        const deptReads: Record<string, any> = {}
+        for (const deptId of oldDepts) {
+          const deptRef = doc(db, 'departments', deptId)
+          const deptSnap = await tx.get(deptRef)
+          if (deptSnap.exists()) {
+            deptReads[deptId] = deptSnap.data()
+          }
+        }
+        
+        // Now perform all writes after all reads are complete
+        
         // For each department, decrement the filledCount
         for (const oldDeptId of oldDepts) {
-          const deptRef = doc(db, 'departments', oldDeptId)
-          const deptSnap = await tx.get(deptRef)
-          
-          if (deptSnap.exists()) {
-            const deptData = deptSnap.data()
+          const deptData = deptReads[oldDeptId]
+          if (deptData) {
             const currentCount = deptData.filledCount || 0
+            const deptRef = doc(db, 'departments', oldDeptId)
             tx.update(deptRef, { filledCount: Math.max(0, currentCount - 1) })
           }
         }
