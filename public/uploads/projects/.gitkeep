@@ -1,8 +1,0 @@
-# Project Files
-
-This directory stores uploaded project files.
-
-Files are organized by project ID:
-- `/projects/{projectId}/` - Project-specific files
-
-Note: This folder is automatically created when files are uploaded.

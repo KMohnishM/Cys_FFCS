@@ -26,7 +26,6 @@ const eventTypeLabels: Record<string, string> = {
   'project_leave': 'Left Project',
   'contribution_submit': 'Submitted Contribution',
   'contribution_approve': 'Approved Contribution',
-  'contribution_reject': 'Rejected Contribution',
   'user_register': 'Registered'
 };
 
@@ -46,8 +45,6 @@ const getEventTypeColor = (eventType: string): string => {
       return 'bg-cyscom/20 text-cyscom';
     case 'contribution_approve':
       return 'bg-green-500/20 text-green-400';
-    case 'contribution_reject':
-      return 'bg-red-500/20 text-red-400';
     case 'user_register':
       return 'bg-blue-500/20 text-blue-400';
     default:
