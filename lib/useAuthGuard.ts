@@ -18,8 +18,9 @@ const pageAccessRules: Record<string, UserProgress[]> = {
   '/login': [UserProgress.NOT_AUTHENTICATED, UserProgress.NEEDS_DEPARTMENTS, UserProgress.NEEDS_PROJECT, UserProgress.COMPLETE],
   '/dashboard': [UserProgress.NEEDS_DEPARTMENTS, UserProgress.NEEDS_PROJECT, UserProgress.COMPLETE],
   '/departments': [UserProgress.NEEDS_DEPARTMENTS, UserProgress.NEEDS_PROJECT, UserProgress.COMPLETE],
+  // Projects and contributions require departments to be selected first
   '/projects': [UserProgress.NEEDS_PROJECT, UserProgress.COMPLETE],
-  '/contributions': [UserProgress.COMPLETE],
+  '/contributions': [UserProgress.NEEDS_PROJECT, UserProgress.COMPLETE],
   '/leaderboard': [UserProgress.NEEDS_DEPARTMENTS, UserProgress.NEEDS_PROJECT, UserProgress.COMPLETE],
   '/admin': [UserProgress.COMPLETE], // Admin will have separate role check
 }
@@ -95,12 +96,12 @@ export default function useAuthGuard() {
         // Check project
         if (!userData.projectId) {
           setUserProgress(UserProgress.NEEDS_PROJECT)
-          
-          // Redirect to projects page if trying to access pages that require project
-          if (router.pathname === '/contributions') {
-            router.push('/projects')
+
+          // Do not forcibly redirect users away from contributions — allow authenticated users to access it even if they haven't picked a project yet.
+          if (router.pathname !== '/contributions' && router.pathname === '/contributions') {
+            // no-op
           }
-          
+
           setIsLoading(false)
           return
         }

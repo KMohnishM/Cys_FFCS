@@ -468,16 +468,19 @@ export default function Contributions() {
           {/* Contributions List */}
           <section className="ascii-card space-y-4">
             <span className="ascii-card-top" aria-hidden="true">+-----------------------+</span>
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
               <p className="ascii-meta">Contribution History</p>
-              <div className="text-xs tracking-wide">
-                {contribs.length} item{contribs.length !== 1 ? 's' : ''}
+              <div className="flex items-center gap-2">
+                <button className={`px-3 py-1 rounded ${statusFilter === 'all' ? 'bg-sky-600 text-white' : 'bg-slate-100 text-black'}`} onClick={() => setStatusFilter('all')}>All ({statusCounts.all})</button>
+                <button className={`px-3 py-1 rounded ${statusFilter === 'pending' ? 'bg-sky-600 text-white' : 'bg-slate-100 text-black'}`} onClick={() => setStatusFilter('pending')}>Pending ({statusCounts.pending})</button>
+                <button className={`px-3 py-1 rounded ${statusFilter === 'verified' ? 'bg-sky-600 text-white' : 'bg-slate-100 text-black'}`} onClick={() => setStatusFilter('verified')}>Verified ({statusCounts.verified})</button>
+                <button className={`px-3 py-1 rounded ${statusFilter === 'rejected' ? 'bg-sky-600 text-white' : 'bg-slate-100 text-black'}`} onClick={() => setStatusFilter('rejected')}>Rejected ({statusCounts.rejected})</button>
               </div>
             </div>
 
             {user ? (
               <div className="space-y-4">
-                {contribs.length === 0 && (
+                {visibleContribs.length === 0 && (
                   <div className="py-8 text-center">
                     <div className="text-sm uppercase tracking-wider opacity-50">
                       No contributions found
@@ -488,7 +491,7 @@ export default function Contributions() {
                   </div>
                 )}
 
-                {contribs.map((c) => (
+                {visibleContribs.map((c) => (
                   <div key={c.contribId} className="border border-white p-4 space-y-3">
                     <div className="flex justify-between items-start">
                       <div className="flex gap-2 items-center text-xs uppercase tracking-wider opacity-70">
