@@ -4,6 +4,7 @@ import { collection, query, where, onSnapshot, doc, runTransaction, updateDoc, g
 import { ref } from 'firebase/storage'
 import type { Contribution, User, Department, Project } from '../types'
 import AdminAnalytics from '../components/AdminAnalytics'
+import ActivityLog from '../components/ActivityLog'
 import { trackEvent } from '../lib/analytics'
 
 export default function Admin() {
@@ -18,6 +19,7 @@ export default function Admin() {
   const [viewerUrl, setViewerUrl] = useState<string | null>(null)
   const [viewerZoom, setViewerZoom] = useState<number>(1)
   const [joinRequests, setJoinRequests] = useState<any[]>([])
+  const [userDepartmentSelections, setUserDepartmentSelections] = useState<Record<string, string[]>>({})
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -59,17 +61,15 @@ export default function Admin() {
     if (typeof window === 'undefined') return
     const db = getDbClient()
     const col = collection(db, 'contributions')
-    // build query based on filter
-    let q
-    if (contribFilter === 'all') {
-      q = query(col)
-    } else {
-      q = query(col, where('status', '==', contribFilter))
-    }
+    const q = contribFilter === 'all' ? query(col) : query(col, where('status', '==', contribFilter))
+
     const unsub = onSnapshot(q, (snap) => {
       const list: Contribution[] = []
       snap.forEach((d) => {
         const data = d.data() as any
+        const rawCreated = data.createdAt
+        const createdAt = rawCreated?.toDate ? rawCreated.toDate() : rawCreated instanceof Date ? rawCreated : new Date()
+
         list.push({
           contribId: d.id,
           userId: data.userId,
@@ -78,12 +78,26 @@ export default function Admin() {
           imageUrl: data.imageUrl,
           status: data.status,
           pointsAwarded: data.pointsAwarded,
+          createdAt,
+          verifiedBy: data.verifiedBy,
+          verifiedAt: data.verifiedAt,
         })
       })
+
+      list.sort((a, b) => {
+        const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0
+        const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0
+        return bTime - aTime
+      })
+
       setContributions(list)
+    }, (err) => {
+      console.error('Failed to load contributions for admin', err)
+      setContributions([])
     })
+
     return () => unsub()
-  }, [])
+  }, [contribFilter])
   
   // Load users for department management
   useEffect(() => {
@@ -106,6 +120,13 @@ export default function Admin() {
         })
       })
       setUsers(list)
+      
+      // Initialize department selections state
+      const selections: Record<string, string[]> = {}
+      list.forEach(user => {
+        selections[user.userId] = user.departments || []
+      })
+      setUserDepartmentSelections(selections)
     })
     return () => unsub()
   }, [userRole])
@@ -241,6 +262,15 @@ export default function Admin() {
       })
       
       alert('User departments updated successfully')
+      
+      // Update local state to reflect the changes
+      setUsers(prev => prev.map(u => 
+        u.userId === userId ? { ...u, departments: departments } : u
+      ))
+      setUserDepartmentSelections(prev => ({
+        ...prev,
+        [userId]: departments
+      }))
     } catch (e) {
       console.error('Update departments failed', e)
       alert(`Failed to update departments: ${e instanceof Error ? e.message : String(e)}`)
@@ -283,6 +313,15 @@ export default function Admin() {
       })
       
       alert('User departments reset successfully')
+      
+      // Update local state to reflect the reset
+      setUsers(prev => prev.map(u => 
+        u.userId === userId ? { ...u, departments: [] } : u
+      ))
+      setUserDepartmentSelections(prev => ({
+        ...prev,
+        [userId]: []
+      }))
     } catch (e) {
       console.error('Reset departments failed', e)
       alert(`Failed to reset departments: ${e instanceof Error ? e.message : String(e)}`)
@@ -298,6 +337,7 @@ export default function Admin() {
     try {
       const auth = getAuthClient()
       const current = auth.currentUser
+      let logContext: { userId: string; projectId?: string | null } | null = null
       await runTransaction(db, async (tx) => {
         const cSnap = await tx.get(contribRef)
         if (!cSnap.exists()) throw new Error('Contribution not found')
@@ -313,7 +353,21 @@ export default function Admin() {
 
         tx.update(contribRef, { status: 'verified', pointsAwarded: points || 0, verifiedBy: current?.uid ?? null, verifiedAt: new Date() })
         tx.update(userRef, { totalPoints: newPoints })
+
+        logContext = { userId: c.userId, projectId: c.projectId }
       })
+
+      if (logContext !== null) {
+        const { userId: reviewedUserId, projectId } = logContext
+        void trackEvent('contribution_approve', {
+          metadata: {
+            contributionId: contribId,
+            reviewedUserId,
+            projectId: projectId ?? 'general',
+            pointsAwarded: points || 0,
+          },
+        })
+      }
     } catch (e) {
       console.error('Approve failed', e)
       alert('Failed to approve')
@@ -327,10 +381,14 @@ export default function Admin() {
     const contribRef = doc(db, 'contributions', contribId)
     setLoading(contribId, true)
     try {
+      const auth = getAuthClient()
+      const current = auth.currentUser
+      let logContext: { userId?: string; projectId?: string | null } = {}
       // delete image from storage if present
       const cSnap = await (await import('firebase/firestore')).getDoc(contribRef)
       if (cSnap.exists()){
         const data = cSnap.data() as any
+        logContext = { userId: data.userId, projectId: data.projectId }
         if (data.imageUrl){
           try{
             const storage = getStorageClient()
@@ -345,7 +403,18 @@ export default function Admin() {
           }
         }
       }
-      await updateDoc(contribRef, { status: 'rejected' })
+      await updateDoc(contribRef, { status: 'rejected', verifiedBy: current?.uid ?? null, verifiedAt: new Date() })
+
+      if (logContext.userId) {
+        const { userId: reviewedUserId, projectId } = logContext
+        void trackEvent('contribution_reject', {
+          metadata: {
+            contributionId: contribId,
+            reviewedUserId,
+            projectId: projectId ?? 'general',
+          },
+        })
+      }
     } catch (e) {
       console.error('Reject failed', e)
       alert('Failed to reject')
@@ -539,63 +608,133 @@ export default function Admin() {
             <h2 className="text-2xl font-semibold text-white">Verify Contributions</h2>
             <p className="text-slate-300 mt-2">Approve or reject pending contributions and assign points.</p>
 
-            <div className="mt-6 space-y-4">
-              <div className="flex items-center gap-4">
-                <h3 className="text-lg font-medium">Contributions</h3>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setContribFilter('pending')}
-                    className={`px-2 py-1 rounded ${contribFilter === 'pending' ? 'bg-sky-600 text-white' : 'bg-slate-100'}`}>
-                    Pending
-                  </button>
-                  <button
-                    onClick={() => setContribFilter('all')}
-                    className={`px-2 py-1 rounded ${contribFilter === 'all' ? 'bg-sky-600 text-white' : 'bg-slate-100'}`}>
-                    All
-                  </button>
-                  <button
-                    onClick={() => setContribFilter('verified')}
-                    className={`px-2 py-1 rounded ${contribFilter === 'verified' ? 'bg-sky-600 text-white' : 'bg-slate-100'}`}>
-                    Verified
-                  </button>
-                  <button
-                    onClick={() => setContribFilter('rejected')}
-                    className={`px-2 py-1 rounded ${contribFilter === 'rejected' ? 'bg-sky-600 text-white' : 'bg-slate-100'}`}>
-                    Rejected
-                  </button>
-                </div>
-              </div>
-
-              {contributions.length === 0 && <p className="text-slate-300">No contributions.</p>}
-              {contributions.map((c: Contribution) => (
-                <div key={c.contribId} className="p-3 rounded bg-black/30">
-                  <div className="flex items-start gap-4">
-                    <div className="flex-1">
-                      <p className="text-slate-200">{c.text}</p>
-                      {c.imageUrl && (
-                        <div className="mt-2">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={c.imageUrl} alt="contrib" className="max-h-48 rounded inline-block mr-2 border" />
-                          <button
-                            onClick={() => { setViewerUrl(c.imageUrl ?? null); setViewerZoom(1) }}
-                            className="px-2 py-1 bg-cyberblue-700 text-white rounded ml-2 text-sm"
-                          >
-                            View
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                    <div className="w-40 text-right">
-                      <label className="text-sm text-slate-300 block">Points</label>
-                      <input id={`points-${c.contribId}`} type="number" defaultValue={5} className="w-full mt-1 p-2 rounded bg-black/20 text-white" />
-                      <div className="mt-3 flex gap-2 justify-end">
-                        <button onClick={async ()=>{ const val = (document.getElementById(`points-${c.contribId}`) as HTMLInputElement).value; await approve(c.contribId, Number(val)) }} disabled={loadingIds.includes(c.contribId)} className="px-3 py-1 rounded bg-green-600 text-white">{loadingIds.includes(c.contribId)?'Processing':'Approve'}</button>
-                        <button onClick={async ()=> await reject(c.contribId)} disabled={loadingIds.includes(c.contribId)} className="px-3 py-1 rounded bg-red-600 text-white">Reject</button>
-                      </div>
-                    </div>
+            <div className="mt-6 grid gap-6 lg:grid-cols-[2fr_1fr]">
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-center gap-4">
+                  <h3 className="text-lg font-medium">Contributions</h3>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => setContribFilter('pending')}
+                      className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${contribFilter === 'pending' ? 'bg-sky-600 text-white shadow shadow-sky-600/30' : 'bg-black/30 text-slate-200 border border-slate-700 hover:bg-black/40'}`}>
+                      Pending ({contributions.filter((c) => c.status === 'pending').length})
+                    </button>
+                    <button
+                      onClick={() => setContribFilter('all')}
+                      className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${contribFilter === 'all' ? 'bg-sky-600 text-white shadow shadow-sky-600/30' : 'bg-black/30 text-slate-200 border border-slate-700 hover:bg-black/40'}`}>
+                      All ({contributions.length})
+                    </button>
+                    <button
+                      onClick={() => setContribFilter('verified')}
+                      className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${contribFilter === 'verified' ? 'bg-sky-600 text-white shadow shadow-sky-600/30' : 'bg-black/30 text-slate-200 border border-slate-700 hover:bg-black/40'}`}>
+                      Approved ({contributions.filter((c) => c.status === 'verified').length})
+                    </button>
+                    <button
+                      onClick={() => setContribFilter('rejected')}
+                      className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${contribFilter === 'rejected' ? 'bg-sky-600 text-white shadow shadow-sky-600/30' : 'bg-black/30 text-slate-200 border border-slate-700 hover:bg-black/40'}`}>
+                      Rejected ({contributions.filter((c) => c.status === 'rejected').length})
+                    </button>
                   </div>
                 </div>
-              ))}
+
+                {contributions.length === 0 && (
+                  <p className="text-slate-300 bg-black/30 border border-slate-800 rounded-lg p-4">No contributions found for this filter.</p>
+                )}
+
+                {contributions.map((c: Contribution) => {
+                  const isPending = c.status === 'pending'
+                  const submittedAt = c.createdAt ? new Date(c.createdAt).toLocaleString() : 'Unknown time'
+                  const statusClasses =
+                    c.status === 'verified'
+                      ? 'bg-green-900/40 text-green-300 border border-green-600/40'
+                      : c.status === 'rejected'
+                      ? 'bg-red-900/40 text-red-300 border border-red-600/40'
+                      : 'bg-yellow-900/40 text-yellow-300 border border-yellow-600/40'
+
+                  return (
+                    <div key={c.contribId} className="p-4 rounded-xl bg-black/30 border border-slate-800 hover:border-cyscom/40 transition-colors">
+                      <div className="flex flex-col gap-4 md:flex-row md:items-start">
+                        <div className="flex-1">
+                          <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
+                            <div className="space-y-1">
+                              <p className="text-xs uppercase tracking-wider text-slate-500">Submitted</p>
+                              <p className="text-sm text-slate-300">{submittedAt}</p>
+                              <p className="text-xs text-slate-400">User: <span className="font-mono text-slate-200">{c.userId}</span></p>
+                              {c.projectId && (
+                                <p className="text-xs text-slate-400">Project: <span className="font-semibold text-cyscom/90">{c.projectId}</span></p>
+                              )}
+                            </div>
+                            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusClasses}`}>
+                              {c.status === 'verified' ? 'Approved' : c.status === 'rejected' ? 'Rejected' : 'Pending Review'}
+                            </span>
+                          </div>
+
+                          <p className="text-slate-200 leading-relaxed">{c.text}</p>
+
+                          {c.imageUrl && (
+                            <div className="mt-3">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={c.imageUrl} alt="contrib" className="max-h-48 rounded-lg border border-slate-700/60" />
+                              <button
+                                onClick={() => { setViewerUrl(c.imageUrl ?? null); setViewerZoom(1) }}
+                                className="mt-2 inline-flex items-center gap-1 px-3 py-1 bg-cyberblue-700 text-white rounded text-sm"
+                              >
+                                View Full
+                              </button>
+                            </div>
+                          )}
+
+                          {!isPending && (
+                            <div className="mt-3 text-sm text-slate-400">
+                              {c.status === 'verified' && (
+                                <span>Awarded Points: <strong className="text-cyscom">{c.pointsAwarded ?? 0}</strong></span>
+                              )}
+                              {c.status === 'rejected' && <span>No points awarded</span>}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="w-full md:w-48">
+                          <label className="text-sm text-slate-300 block">Points</label>
+                          <input
+                            id={`points-${c.contribId}`}
+                            type="number"
+                            defaultValue={c.pointsAwarded ?? 5}
+                            className="w-full mt-1 p-2 rounded bg-black/20 text-white border border-slate-700/60"
+                            disabled={!isPending}
+                          />
+                          <div className="mt-3 flex gap-2 justify-end">
+                            <button
+                              onClick={async () => {
+                                const val = (document.getElementById(`points-${c.contribId}`) as HTMLInputElement).value
+                                await approve(c.contribId, Number(val))
+                              }}
+                              disabled={!isPending || loadingIds.includes(c.contribId)}
+                              className={`px-3 py-1 rounded text-sm font-semibold ${!isPending || loadingIds.includes(c.contribId) ? 'bg-green-900/40 text-green-300/50 cursor-not-allowed' : 'bg-green-600 text-white hover:bg-green-500'}`}
+                            >
+                              {loadingIds.includes(c.contribId) ? 'Processing' : 'Approve'}
+                            </button>
+                            <button
+                              onClick={async () => await reject(c.contribId)}
+                              disabled={!isPending || loadingIds.includes(c.contribId)}
+                              className={`px-3 py-1 rounded text-sm font-semibold ${!isPending || loadingIds.includes(c.contribId) ? 'bg-red-900/40 text-red-300/50 cursor-not-allowed' : 'bg-red-600 text-white hover:bg-red-500'}`}
+                            >
+                              Reject
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              <div className="space-y-4">
+                <div className="p-4 rounded-xl bg-black/30 border border-slate-800">
+                  <h3 className="text-lg font-semibold text-white">Review Activity</h3>
+                  <p className="text-sm text-slate-400 mb-3">Latest contribution submissions and moderation actions.</p>
+                  <ActivityLog limitCount={15} />
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -608,90 +747,147 @@ export default function Admin() {
             
             <div className="mt-6 space-y-6">
               {users.length === 0 && <p className="text-slate-300">No users found.</p>}
-              {users.map((user) => (
-                <div key={user.userId} className="p-4 rounded bg-black/30">
-                  <div className="flex flex-col md:flex-row md:items-start gap-4">
-                    <div className="flex-1">
-                      <h4 className="text-lg font-medium text-white">{user.name}</h4>
-                      <p className="text-sm text-slate-400">{user.email}</p>
-                      <p className="text-sm text-slate-300 mt-1">
-                        Points: {user.totalPoints || 0}
-                        {user.projectId && <span className="ml-2">| Project ID: {user.projectId}</span>}
-                      </p>
-                      
-                      <div className="mt-3">
-                        <h5 className="text-sm font-medium text-slate-300 mb-2">Current Departments:</h5>
-                        {user.departments && user.departments.length > 0 ? (
-                          <div className="flex flex-wrap gap-2">
-                            {user.departments.map(deptId => {
-                              const dept = departments.find(d => d.deptId === deptId);
-                              return (
-                                <span key={deptId} className="px-2 py-1 bg-slate-700 text-xs rounded">
-                                  {dept ? dept.name : deptId}
-                                </span>
-                              );
-                            })}
+              {users.map((user) => {
+                const currentSelections = userDepartmentSelections[user.userId] || []
+                const originalDepartments = user.departments || []
+                const hasChanges = JSON.stringify(currentSelections.sort()) !== JSON.stringify(originalDepartments.sort())
+                
+                return (
+                  <div key={user.userId} className="p-4 rounded-xl bg-black/30 border border-slate-800">
+                    <div className="flex flex-col md:flex-row md:items-start gap-4">
+                      <div className="flex-1">
+                        <h4 className="text-lg font-medium text-white">{user.name}</h4>
+                        <p className="text-sm text-slate-400">{user.email}</p>
+                        <p className="text-sm text-slate-300 mt-1">
+                          Points: {user.totalPoints || 0}
+                          {user.projectId && <span className="ml-2">| Project ID: {user.projectId}</span>}
+                        </p>
+                        
+                        <div className="mt-3">
+                          <h5 className="text-sm font-medium text-slate-300 mb-2">Current Departments:</h5>
+                          {originalDepartments.length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                              {originalDepartments.map(deptId => {
+                                const dept = departments.find(d => d.deptId === deptId);
+                                return (
+                                  <span key={deptId} className="px-2 py-1 bg-slate-700 text-xs rounded">
+                                    {dept ? dept.name : deptId}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <p className="text-sm text-slate-500">No departments selected</p>
+                          )}
+                        </div>
+                        
+                        {hasChanges && (
+                          <div className="mt-3 p-3 bg-yellow-900/20 border border-yellow-600/40 rounded-lg">
+                            <h6 className="text-sm font-medium text-yellow-400 mb-2">Pending Changes:</h6>
+                            {currentSelections.length > 0 ? (
+                              <div className="flex flex-wrap gap-2">
+                                {currentSelections.map(deptId => {
+                                  const dept = departments.find(d => d.deptId === deptId);
+                                  return (
+                                    <span key={deptId} className="px-2 py-1 bg-yellow-600/40 text-yellow-300 text-xs rounded">
+                                      {dept ? dept.name : deptId}
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <p className="text-sm text-yellow-300">No departments selected</p>
+                            )}
                           </div>
-                        ) : (
-                          <p className="text-sm text-slate-500">No departments selected</p>
                         )}
                       </div>
-                    </div>
-                    
-                    <div className="w-full md:w-64">
-                      <div className="bg-black/20 p-3 rounded">
-                        <h5 className="text-sm font-medium text-slate-300 mb-2">Update Departments:</h5>
-                        <div className="max-h-32 overflow-y-auto space-y-2">
-                          {departments.map(dept => (
-                            <div key={dept.deptId} className="flex items-center">
-                              <input
-                                type="checkbox"
-                                id={`dept-${user.userId}-${dept.deptId}`}
-                                checked={user.departments?.includes(dept.deptId) || false}
-                                onChange={(e) => {
-                                  const checked = e.target.checked;
-                                  const updatedDepts = checked
-                                    ? [...(user.departments || []), dept.deptId]
-                                    : (user.departments || []).filter(d => d !== dept.deptId);
-                                  
-                                  // Don't actually update yet, just handle the checkbox UI
-                                  // The user will need to click "Update" to apply changes
-                                  e.target.checked = checked;
-                                }}
-                                className="mr-2"
-                              />
-                              <label htmlFor={`dept-${user.userId}-${dept.deptId}`} className="text-sm text-slate-300">
-                                {dept.name} ({dept.filledCount}/{dept.capacity})
-                              </label>
-                            </div>
-                          ))}
-                        </div>
-                        <div className="mt-3 flex gap-2">
-                          <button
-                            onClick={() => {
-                              const selectedDepts = departments
-                                .filter(dept => (document.getElementById(`dept-${user.userId}-${dept.deptId}`) as HTMLInputElement)?.checked)
-                                .map(dept => dept.deptId);
-                              updateUserDepartments(user.userId, selectedDepts);
-                            }}
-                            disabled={loadingIds.includes(user.userId)}
-                            className="flex-1 px-3 py-1 rounded bg-cyscom text-black text-sm"
-                          >
-                            {loadingIds.includes(user.userId) ? 'Processing...' : 'Update'}
-                          </button>
-                          <button
-                            onClick={() => resetUserDepartments(user.userId)}
-                            disabled={loadingIds.includes(user.userId) || !(user.departments && user.departments.length > 0)}
-                            className="flex-1 px-3 py-1 rounded bg-red-600 text-white text-sm"
-                          >
-                            Reset
-                          </button>
+                      
+                      <div className="w-full md:w-64">
+                        <div className="bg-black/20 p-3 rounded">
+                          <h5 className="text-sm font-medium text-slate-300 mb-2">Update Departments:</h5>
+                          <div className="max-h-32 overflow-y-auto space-y-2">
+                            {departments.map(dept => {
+                              const isSelected = currentSelections.includes(dept.deptId)
+                              const isAtCapacity = dept.filledCount >= dept.capacity
+                              
+                              return (
+                                <div key={dept.deptId} className="flex items-center">
+                                  <input
+                                    type="checkbox"
+                                    id={`dept-${user.userId}-${dept.deptId}`}
+                                    checked={isSelected}
+                                    onChange={(e) => {
+                                      const checked = e.target.checked
+                                      setUserDepartmentSelections(prev => ({
+                                        ...prev,
+                                        [user.userId]: checked
+                                          ? [...(prev[user.userId] || []), dept.deptId]
+                                          : (prev[user.userId] || []).filter(id => id !== dept.deptId)
+                                      }))
+                                    }}
+                                    disabled={isAtCapacity && !isSelected}
+                                    className="mr-2"
+                                  />
+                                  <label 
+                                    htmlFor={`dept-${user.userId}-${dept.deptId}`} 
+                                    className={`text-sm ${isAtCapacity && !isSelected ? 'text-slate-500' : 'text-slate-300'}`}
+                                  >
+                                    {dept.name} ({dept.filledCount}/{dept.capacity})
+                                    {isAtCapacity && !isSelected && <span className="text-red-400 ml-1">(Full)</span>}
+                                  </label>
+                                </div>
+                              )
+                            })}
+                          </div>
+                          <div className="mt-3 flex gap-2">
+                            <button
+                              onClick={() => {
+                                const selectedDepts = userDepartmentSelections[user.userId] || []
+                                updateUserDepartments(user.userId, selectedDepts)
+                              }}
+                              disabled={loadingIds.includes(user.userId) || !hasChanges}
+                              className={`flex-1 px-3 py-1 rounded text-sm font-semibold ${
+                                loadingIds.includes(user.userId) || !hasChanges
+                                  ? 'bg-slate-600 text-slate-400 cursor-not-allowed'
+                                  : 'bg-cyscom text-black hover:bg-cyscom/90'
+                              }`}
+                            >
+                              {loadingIds.includes(user.userId) ? 'Processing...' : 'Update'}
+                            </button>
+                            <button
+                              onClick={() => {
+                                setUserDepartmentSelections(prev => ({
+                                  ...prev,
+                                  [user.userId]: []
+                                }))
+                              }}
+                              disabled={loadingIds.includes(user.userId) || currentSelections.length === 0}
+                              className={`px-3 py-1 rounded text-sm font-semibold ${
+                                loadingIds.includes(user.userId) || currentSelections.length === 0
+                                  ? 'bg-red-900/40 text-red-300/50 cursor-not-allowed'
+                                  : 'bg-red-600 text-white hover:bg-red-500'
+                              }`}
+                            >
+                              Clear
+                            </button>
+                            <button
+                              onClick={() => resetUserDepartments(user.userId)}
+                              disabled={loadingIds.includes(user.userId)}
+                              className={`px-3 py-1 rounded text-sm font-semibold ${
+                                loadingIds.includes(user.userId)
+                                  ? 'bg-orange-900/40 text-orange-300/50 cursor-not-allowed'
+                                  : 'bg-orange-600 text-white hover:bg-orange-500'
+                              }`}
+                            >
+                              Reset DB
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         )}
@@ -768,15 +964,41 @@ export default function Admin() {
                         // Upload files if any
                         let fileUrls: string[] = []
                         if (files && files.length > 0) {
-                          const storage = getStorageClient()
+                          // Convert files to base64 data URLs
+                          const fileDataArray: Array<{ filename: string; dataUrl: string }> = []
+                          
                           for (let i = 0; i < files.length; i++) {
                             const file = files[i]
-                            const fileRef = ref(storage, `projects/${projectId}/${file.name}`)
-                            const { uploadBytes, getDownloadURL } = await import('firebase/storage')
-                            await uploadBytes(fileRef, file)
-                            const url = await getDownloadURL(fileRef)
-                            fileUrls.push(url)
+                            const dataUrl = await new Promise<string>((resolve, reject) => {
+                              const reader = new FileReader()
+                              reader.onload = () => resolve(reader.result as string)
+                              reader.onerror = reject
+                              reader.readAsDataURL(file)
+                            })
+                            
+                            fileDataArray.push({
+                              filename: file.name,
+                              dataUrl: dataUrl
+                            })
                           }
+                          
+                          // Upload to our API
+                          const uploadResponse = await fetch('/api/upload-project-files', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              projectId: projectId,
+                              files: fileDataArray
+                            })
+                          })
+                          
+                          if (!uploadResponse.ok) {
+                            const error = await uploadResponse.json()
+                            throw new Error(error.error || 'Failed to upload files')
+                          }
+                          
+                          const uploadResult = await uploadResponse.json()
+                          fileUrls = uploadResult.urls || []
                         }
 
                         await setDoc(projectRef, {
