@@ -5,6 +5,12 @@ service firebase.storage {
       return request.auth != null && request.auth.token.email.matches('.*@vitstudent\\.ac\\.in')
     }
 
+    function isAdmin() {
+      return isCollege() && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'superadmin');
+    }
+
     // Allow read access to all files for authenticated college users
     match /{allPaths=**} {
       allow read: if isCollege();
@@ -15,6 +21,13 @@ service firebase.storage {
       allow write: if isCollege() && request.auth.uid == userId && 
                     request.resource.size < 5 * 1024 * 1024 && // 5MB limit
                     request.resource.contentType.matches('image/.*');
+    }
+    
+    // Allow admins to upload project files
+    match /projects/{projectId}/{filename} {
+      allow write: if isAdmin() && 
+                    request.resource.size < 10 * 1024 * 1024; // 10MB limit for project files
+      allow read: if isCollege();
     }
   }
 }
